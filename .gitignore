@@ -87,3 +87,24 @@ ENV/
 
 # Rope project settings
 .ropeproject
+
+# data dir
+/data/
+
+# model dir
+/models/
+
+# log dir
+/log/
+
+# tmp dir
+/tmp/
+
+# experiments dir
+/experiments/
+
+# IDE 
+/.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
