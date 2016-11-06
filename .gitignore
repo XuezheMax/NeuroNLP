@@ -100,8 +100,8 @@ ENV/
 # tmp dir
 /tmp/
 
-# experiments dir
-/experiments/
+# test dir
+/tests/
 
 # IDE 
 /.idea/
