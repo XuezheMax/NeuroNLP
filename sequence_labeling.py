@@ -392,7 +392,7 @@ def main():
         assert dev_total == dev_total_nr + dev_inst
         print 'dev loss: %.4f, corr: %d, total: %d, acc: %.2f%%' % (
             dev_err / dev_inst, dev_corr, dev_total, dev_corr * 100 / dev_total)
-        print 'dev(no root)   corr: %d, total: %d, acc: %.2f%%' % (
+        print 'dev(no root)      corr: %d, total: %d, acc: %.2f%%' % (
             dev_corr_nr, dev_total_nr, dev_corr_nr * 100 / dev_total_nr)
 
         if dev_correct_nr < dev_corr_nr:
@@ -425,11 +425,11 @@ def main():
             test_correct_nr = test_corr_nr
         print "best dev loss: %.4f, corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
             dev_loss / dev_inst, dev_correct, dev_total, dev_correct * 100 / dev_total, best_epoch)
-        print "best dev(no root)   corr: %d, total: %d, acc: %.2f%%" % (
+        print "best dev(no root)      corr: %d, total: %d, acc: %.2f%%" % (
             dev_correct_nr, dev_total_nr, dev_correct_nr * 100 / dev_total_nr)
         print "test     loss: %.4f, corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
             test_loss / test_inst, test_correct, test_total, test_correct * 100 / test_total, best_epoch)
-        print "test(no root)       corr: %d, total: %d, acc: %.2f%%" % (
+        print "test(no root)          corr: %d, total: %d, acc: %.2f%%" % (
             test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr)
 
         if epoch in schedule:
