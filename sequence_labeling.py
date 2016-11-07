@@ -17,7 +17,7 @@ from lasagne.updates import nesterov_momentum
 
 from neuronlp.io import data_utils
 from neuronlp import utils
-from neuronlp.layers.recurrent import *
+from neuronlp.layers.recurrent import LSTMLayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
 from neuronlp.layers.pool import PoolTimeStep1DLayer
 from neuronlp.layers.crf import ChainCRFLayer

@@ -282,7 +282,7 @@ class CustomRecurrentLayer(MergeLayer):
         if not deterministic and self.p:
             one = T.constant(1)
             retain_prob = one - self.p
-            dropout_mask_shape = (num_batch,) + input.shape[2:]
+            dropout_mask_shape = (num_batch, self.hidden_to_hidden.output_shape[1])
             dropout_mask = self._srng.binomial(dropout_mask_shape, p=retain_prob, dtype=input.dtype)
 
         if self.precompute_input:
@@ -311,10 +311,10 @@ class CustomRecurrentLayer(MergeLayer):
         # Create single recurrent computation step function
         def step(input_n, hid_previous, *args):
             # check dropout
-            if not deterministic and self.p:
-                hid_input = (hid_previous / retain_prob) * dropout_mask
-            else:
+            if deterministic or self.p == 0:
                 hid_input = hid_previous
+            else:
+                hid_input = (hid_previous / retain_prob) * dropout_mask
             # Compute the hidden-to-hidden activation
             hid_pre = helper.get_output(
                 self.hidden_to_hidden, hid_input, **kwargs)
@@ -348,6 +348,9 @@ class CustomRecurrentLayer(MergeLayer):
         else:
             sequences = input
             step_fun = step
+
+        if not deterministic and self.p:
+            non_seqs += [dropout_mask]
 
         if not isinstance(self.hid_init, Layer):
             # The code below simply repeats self.hid_init num_batch times in
@@ -772,11 +775,12 @@ class LSTMLayer(MergeLayer):
         # (n_time_steps, n_batch, n_features)
         input = input.dimshuffle(1, 0, 2)
         seq_len, num_batch, _ = input.shape
+        # create dropout mask
         dropout_mask = None
         if not deterministic and self.p:
             one = T.constant(1)
             retain_prob = one - self.p
-            dropout_mask_shape = (num_batch,) + input.shape[2:]
+            dropout_mask_shape = (num_batch, self.num_units)
             dropout_mask = self._srng.binomial(dropout_mask_shape, p=retain_prob, dtype=input.dtype)
 
         # Stack input weight matrices into a (num_inputs, 4*num_units)
@@ -813,11 +817,10 @@ class LSTMLayer(MergeLayer):
             if not self.precompute_input:
                 input_n = T.dot(input_n, W_in_stacked) + b_stacked
 
-            # check dropout
-            if not deterministic and self.p:
-                hid_input = (hid_previous / retain_prob) * dropout_mask
-            else:
+            if deterministic or self.p == 0:
                 hid_input = hid_previous
+            else:
+                hid_input = (hid_previous / retain_prob) * dropout_mask
             # Calculate gates pre-activations and slice
             gates = input_n + T.dot(hid_input, W_hid_stacked)
 
@@ -895,6 +898,9 @@ class LSTMLayer(MergeLayer):
         # provide the input weights and biases to the step function
         if not self.precompute_input:
             non_seqs += [W_in_stacked, b_stacked]
+
+        if not deterministic and self.p:
+            non_seqs += [dropout_mask]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
@@ -1140,7 +1146,7 @@ class GRULayer(MergeLayer):
         if not deterministic and self.p:
             one = T.constant(1)
             retain_prob = one - self.p
-            dropout_mask_shape = (num_batch,) + input.shape[2:]
+            dropout_mask_shape = (num_batch, self.num_units)
             dropout_mask = self._srng.binomial(dropout_mask_shape, p=retain_prob, dtype=input.dtype)
 
         # Stack input weight matrices into a (num_inputs, 3*num_units)
@@ -1173,10 +1179,10 @@ class GRULayer(MergeLayer):
         # input__n is the n'th vector of the input
         def step(input_n, hid_previous, *args):
             # check dropout
-            if not deterministic and self.p:
-                hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask
-            else:
+            if deterministic or self.p == 0:
                 hid_previous_dropped = hid_previous
+            else:
+                hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask
             # Compute W_{hr} h_{t - 1}, W_{hu} h_{t - 1}, and W_{hc} h_{t - 1}
             hid_input = T.dot(hid_previous_dropped, W_hid_stacked)
 
@@ -1239,6 +1245,9 @@ class GRULayer(MergeLayer):
         # provide the input weights and biases to the step function
         if not self.precompute_input:
             non_seqs += [W_in_stacked, b_stacked]
+
+        if not deterministic and self.p:
+            non_seqs += [dropout_mask]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
