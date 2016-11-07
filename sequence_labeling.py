@@ -322,8 +322,6 @@ def main():
     best_epoch = 0
     test_loss = 1e+12
     test_correct = 0.0
-    dev_total = 0
-    dev_inst = 0
     test_total = 0
     test_inst = 0
     lr = learning_rate

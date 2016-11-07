@@ -155,10 +155,6 @@ def get_batch(data, batch_size):
         wids, cid_seqs, pids, hids, tids = random.choice(data[bucket_id])
 
         inst_size = len(wids)
-        assert len(cid_seqs) == inst_size
-        assert len(pids) == inst_size
-        assert len(hids) == inst_size
-        assert len(tids) == inst_size
         # word ids
         wid_inputs[b, :inst_size] = wids
         wid_inputs[b, inst_size:] = PAD_ID
@@ -185,6 +181,9 @@ def iterate_batch(data, batch_size, shuffle=False):
     bucket_sizes = [len(data[b]) for b in xrange(len(_buckets))]
     total_size = float(sum(bucket_sizes))
     for bucket_id, bucket_size in enumerate(bucket_sizes):
+        if bucket_size == 0:
+            continue
+
         bucket_length = _buckets[bucket_id]
         wid_inputs = np.empty([bucket_size, bucket_length], dtype=np.int32)
         cid_inputs = np.empty([bucket_size, bucket_length, MAX_CHAR_LENGTH], dtype=np.int32)
@@ -216,14 +215,14 @@ def iterate_batch(data, batch_size, shuffle=False):
             # masks
             masks[i, :inst_size] = 1.0
 
-            indices = None
+        indices = None
+        if shuffle:
+            indices = np.arange(bucket_size)
+            np.random.shuffle(indices)
+        for start_idx in range(0, bucket_size, batch_size):
             if shuffle:
-                indices = np.arange(bucket_size)
-                np.random.shuffle(indices)
-            for start_idx in range(0, bucket_size, batch_size):
-                if shuffle:
-                    excerpt = indices[start_idx:start_idx + batch_size]
-                else:
-                    excerpt = slice(start_idx, start_idx + batch_size)
-                yield wid_inputs[excerpt], cid_inputs[excerpt], pid_inputs[excerpt], hid_inputs[excerpt], \
-                      tid_inputs[excerpt], masks[excerpt]
+                excerpt = indices[start_idx:start_idx + batch_size]
+            else:
+                excerpt = slice(start_idx, start_idx + batch_size)
+            yield wid_inputs[excerpt], cid_inputs[excerpt], pid_inputs[excerpt], hid_inputs[excerpt], \
+                  tid_inputs[excerpt], masks[excerpt]

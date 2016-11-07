@@ -63,6 +63,9 @@ class CoNLLReader(object):
             for char in word:
                 chars.append(char)
                 char_ids.append(self.__char_alphabet.get_index(char))
+            if len(chars) > data_utils.MAX_CHAR_LENGTH:
+                chars = chars[:data_utils.MAX_CHAR_LENGTH]
+                char_ids = char_ids[:data_utils.MAX_CHAR_LENGTH]
             char_seqs.append(chars)
             char_id_seqs.append(char_ids)
 
