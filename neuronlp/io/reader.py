@@ -1,15 +1,15 @@
 __author__ = 'max'
 
-from tensorflow.python.platform import gfile
 
-from instance import Instance
+from instance import DependencyInstance
 import data_utils
 
 
 class CoNLLReader(object):
-    def __init__(self, file_path, word_alphabet, pos_alphabet, type_alphabet):
-        self.__source_file = gfile.GFile(file_path, mode='r')
+    def __init__(self, file_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet):
+        self.__source_file = open(file_path, 'r')
         self.__word_alphabet = word_alphabet
+        self.__char_alphabet = char_alphabet
         self.__pos_alphabet = pos_alphabet
         self.__type_alphabet = type_alphabet
 
@@ -31,6 +31,8 @@ class CoNLLReader(object):
 
         words = []
         word_ids = []
+        char_seqs = []
+        char_id_seqs = []
         postags = []
         pos_ids = []
         types = []
@@ -39,6 +41,8 @@ class CoNLLReader(object):
 
         words.append(data_utils.ROOT)
         word_ids.append(self.__word_alphabet.get_index(data_utils.ROOT))
+        char_seqs.append([data_utils.ROOT_CHAR,])
+        char_id_seqs.append([self.__char_alphabet.get_index(data_utils.ROOT_CHAR),])
         postags.append(data_utils.ROOT_POS)
         pos_ids.append(self.__pos_alphabet.get_index(data_utils.ROOT_POS))
         types.append(data_utils.ROOT_TYPE)
@@ -53,10 +57,21 @@ class CoNLLReader(object):
 
             words.append(word)
             word_ids.append(self.__word_alphabet.get_index(word))
+
+            chars = []
+            char_ids = []
+            for char in word:
+                chars.append(char)
+                char_ids.append(self.__char_alphabet.get_index(char))
+            char_seqs.append(chars)
+            char_id_seqs.append(char_ids)
+
             postags.append(pos)
             pos_ids.append(self.__pos_alphabet.get_index(pos))
+
             types.append(type)
             type_ids.append(self.__type_alphabet.get_index(type))
+
             heads.append(head)
 
-        return Instance(words, word_ids, postags, pos_ids, heads, types, type_ids)
+        return DependencyInstance(words, word_ids, char_seqs, char_id_seqs, postags, pos_ids, heads, types, type_ids)
