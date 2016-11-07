@@ -275,6 +275,7 @@ def main():
     # create variables
     target_var = T.imatrix(name='targets')
     mask_var = T.matrix(name='masks', dtype=theano.config.floatX)
+    mask_nr_var = T.matrix(name='masks_nr', dtype=theano.config.floatX)
     word_var = T.imatrix(name='inputs')
     char_var = T.itensor3(name='char-inputs')
 
@@ -284,6 +285,7 @@ def main():
     logger.info("Network structure: hidden=%d, filter=%d, dropout=%s" % (num_units, num_filters, dropout))
     # compute loss
     num_tokens = mask_var.sum(dtype=theano.config.floatX)
+    num_tokens_nr = mask_nr_var.sum(dtype=theano.config.floatX)
 
     # get outpout of bi-lstm-cnn-crf shape [batch, length, num_labels, num_labels]
     energies_train = lasagne.layers.get_output(network)
@@ -297,19 +299,21 @@ def main():
         loss_train = loss_train + gamma * l2_penalty
 
     _, corr_train = chain_crf_accuracy(energies_train, target_var)
+    corr_nr_train = (corr_train * mask_nr_var).sum(dtype=theano.config.floatX)
     corr_train = (corr_train * mask_var).sum(dtype=theano.config.floatX)
     prediction_eval, corr_eval = chain_crf_accuracy(energies_eval, target_var)
+    corr_nr_eval = (corr_eval * mask_nr_var).sum(dtype=theano.config.floatX)
     corr_eval = (corr_eval * mask_var).sum(dtype=theano.config.floatX)
 
     params = lasagne.layers.get_all_params(network, trainable=True)
     updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, char_var, target_var, mask_var],
-                               [loss_train, corr_train, num_tokens], updates=updates)
+    train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
+                               [loss_train, corr_train, corr_nr_train, num_tokens, num_tokens_nr], updates=updates)
     # Compile a second function evaluating the loss and accuracy of network
-    eval_fn = theano.function([word_var, char_var, target_var, mask_var],
-                              [loss_eval, corr_eval, num_tokens, prediction_eval])
+    eval_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
+                              [loss_eval, corr_eval, corr_nr_eval, num_tokens, num_tokens_nr, prediction_eval])
 
     # Finally, launch the training loop.
     logger.info(
@@ -319,81 +323,114 @@ def main():
     num_batches = num_data / batch_size + 1
     dev_loss = 1e+12
     dev_correct = 0.0
+    dev_correct_nr = 0.0
     best_epoch = 0
     test_loss = 1e+12
     test_correct = 0.0
+    test_correct_nr = 0.0
     test_total = 0
+    test_total_nr = 0
     test_inst = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
         print 'Epoch %d (learning rate=%.4f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
         train_err = 0.0
         train_corr = 0.0
+        train_corr_nr = 0.0
         train_total = 0
+        train_total_nr = 0
         train_inst = 0
         start_time = time.time()
         num_back = 0
         for batch in xrange(1, num_batches + 1):
             wids, cids, pids, _, _, masks = data_utils.get_batch(data_train, batch_size)
-            err, corr, num = train_fn(wids, cids, pids, masks)
+            masks_nr = np.copy(masks)
+            masks_nr[:, 0] = 0
+            err, corr, corr_nr, num, num_nr = train_fn(wids, cids, pids, masks, masks_nr)
             train_err += err * wids.shape[0]
             train_corr += corr
+            train_corr_nr += corr_nr
             train_total += num
+            train_total_nr += num_nr
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
             time_left = (num_batches - batch) * time_ave
 
             # update log
             sys.stdout.write("\b" * num_back)
-            log_info = 'train: %d/%d loss: %.4f, acc: %.2f%%, time left (estimated): %.2fs' % (
-                batch, num_batches, train_err / train_inst, train_corr * 100 / train_total, time_left)
+            log_info = 'train: %d/%d loss: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time left (estimated): %.2fs' % (
+                batch, num_batches, train_err / train_inst, train_corr * 100 / train_total,
+                train_corr_nr * 100 / train_total_nr, time_left)
             sys.stdout.write(log_info)
             num_back = len(log_info)
         # update training log after each epoch
         assert train_inst == num_batches * batch_size
+        assert train_total == train_total_nr + train_inst
         sys.stdout.write("\b" * num_back)
-        print 'train: %d/%d loss: %.4f, acc: %.2f%%, time: %.2fs' % (
-            train_inst, train_inst, train_err / train_inst, train_corr * 100 / train_total, time.time() - start_time)
+        print 'train: %d/%d loss: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time: %.2fs' % (
+            train_inst, train_inst, train_err / train_inst, train_corr * 100 / train_total,
+            train_corr_nr * 100 / train_total_nr, time.time() - start_time)
 
         # evaluate performance on dev data
         dev_err = 0.0
         dev_corr = 0.0
+        dev_corr_nr = 0.0
         dev_total = 0
+        dev_total_nr = 0
         dev_inst = 0
         for batch in data_utils.iterate_batch(data_dev, batch_size):
             wids, cids, pids, _, _, masks = batch
-            err, corr, num, predictions = eval_fn(wids, cids, pids, masks)
+            masks_nr = np.copy(masks)
+            masks_nr[:, 0] = 0
+            err, corr, corr_nr, num, num_nr, predictions = eval_fn(wids, cids, pids, masks, masks_nr)
             dev_err += err * wids.shape[0]
             dev_corr += corr
+            dev_corr_nr += corr_nr
             dev_total += num
+            dev_total_nr += num_nr
             dev_inst += wids.shape[0]
+        assert dev_total == dev_total_nr + dev_inst
         print 'dev loss: %.4f, corr: %d, total: %d, acc: %.2f%%' % (
             dev_err / dev_inst, dev_corr, dev_total, dev_corr * 100 / dev_total)
+        print 'dev(no root)   corr: %d, total: %d, acc: %.2f%%' % (
+            dev_corr_nr, dev_total_nr, dev_corr_nr * 100 / dev_total_nr)
 
-        if dev_correct < dev_corr:
+        if dev_correct_nr < dev_corr_nr:
             dev_correct = dev_corr
+            dev_correct_nr = dev_corr_nr
             dev_loss = dev_err
             best_epoch = epoch
 
             # evaluate on test data when better performance detected
             test_err = 0.0
             test_corr = 0.0
+            test_corr_nr = 0.0
             test_total = 0
+            test_total_nr = 0
             test_inst = 0
             for batch in data_utils.iterate_batch(data_test, batch_size):
                 wids, cids, pids, _, _, masks = batch
-                err, corr, num, predictions = eval_fn(wids, cids, pids, masks)
+                masks_nr = np.copy(masks)
+                masks_nr[:, 0] = 0
+                err, corr, corr_nr, num, num_nr, predictions = eval_fn(wids, cids, pids, masks, masks_nr)
                 test_err += err * wids.shape[0]
                 test_corr += corr
+                test_corr_nr += corr_nr
                 test_total += num
+                test_total_nr += num_nr
                 test_inst += wids.shape[0]
-
+            assert test_total + test_total_nr + test_inst
             test_loss = test_err
             test_correct = test_corr
-        print "best dev loss: %.4f, corr: %d, total: %d, acc: %.2f%% (epoch: %d) " % (
+            test_correct_nr = test_corr_nr
+        print "best dev loss: %.4f, corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
             dev_loss / dev_inst, dev_correct, dev_total, dev_correct * 100 / dev_total, best_epoch)
-        print "test     loss: %.4f, corr: %d, total: %d, acc: %.2f%% (epoch: %d) " % (
+        print "best dev(no root)   corr: %d, total: %d, acc: %.2f%%" % (
+            dev_correct_nr, dev_total_nr, dev_correct_nr * 100 / dev_total_nr)
+        print "test     loss: %.4f, corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
             test_loss / test_inst, test_correct, test_total, test_correct * 100 / test_total, best_epoch)
+        print "test(no root)       corr: %d, total: %d, acc: %.2f%%" % (
+            test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr)
 
         if epoch in schedule:
             lr = lr * decay_rate
