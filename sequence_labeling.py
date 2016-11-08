@@ -405,9 +405,8 @@ def main():
             dev_total_nr += num_nr
             dev_inst += wids.shape[0]
         assert dev_total == dev_total_nr + dev_inst
-        print '         dev corr: %d, total: %d, acc: %.2f%%' % (dev_corr, dev_total, dev_corr * 100 / dev_total)
-        print 'dev(no root) corr: %d, total: %d, acc: %.2f%%' % (
-            dev_corr_nr, dev_total_nr, dev_corr_nr * 100 / dev_total_nr)
+        print 'dev corr: %d, total: %d, acc: %.2f%%, no root corr: %d, total: %d, acc: %.2f%%' % (
+            dev_corr, dev_total, dev_corr * 100 / dev_total, dev_corr_nr, dev_total_nr, dev_corr_nr * 100 / dev_total_nr)
 
         if dev_correct_nr < dev_corr_nr:
             dev_correct = dev_corr
@@ -433,14 +432,12 @@ def main():
             assert test_total + test_total_nr + test_inst
             test_correct = test_corr
             test_correct_nr = test_corr_nr
-        print "best dev          corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
-            dev_correct, dev_total, dev_correct * 100 / dev_total, best_epoch)
-        print "best dev(no root) corr: %d, total: %d, acc: %.2f%%" % (
-            dev_correct_nr, dev_total_nr, dev_correct_nr * 100 / dev_total_nr)
-        print "    test          corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
-            test_correct, test_total, test_correct * 100 / test_total, best_epoch)
-        print "    test(no root) corr: %d, total: %d, acc: %.2f%%" % (
-            test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr)
+        print "best dev corr: %d, total: %d, acc: %.2f%%, no root corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
+            dev_correct, dev_total, dev_correct * 100 / dev_total,
+            dev_correct_nr, dev_total_nr, dev_correct_nr * 100 / dev_total_nr, best_epoch)
+        print "    test corr: %d, total: %d, acc: %.2f%%, no root corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
+            test_correct, test_total, test_correct * 100 / test_total,
+            test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr, best_epoch)
 
         if epoch in schedule:
             lr = lr * decay_rate
