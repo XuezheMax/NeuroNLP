@@ -437,9 +437,9 @@ def main():
             dev_correct, dev_total, dev_correct * 100 / dev_total, best_epoch)
         print "best dev(no root) corr: %d, total: %d, acc: %.2f%%" % (
             dev_correct_nr, dev_total_nr, dev_correct_nr * 100 / dev_total_nr)
-        print "     test         corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
+        print "    test          corr: %d, total: %d, acc: %.2f%% (epoch: %d)" % (
             test_correct, test_total, test_correct * 100 / test_total, best_epoch)
-        print "     test(no root) corr: %d, total: %d, acc: %.2f%%" % (
+        print "    test(no root) corr: %d, total: %d, acc: %.2f%%" % (
             test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr)
 
         if epoch in schedule:
