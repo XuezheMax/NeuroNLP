@@ -384,9 +384,9 @@ def main():
         assert train_inst == num_batches * batch_size
         assert train_total == train_total_nr + train_inst
         sys.stdout.write("\b" * num_back)
-        print 'train: %d/%d loss: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time: %.2fs' % (
-            train_inst, train_inst, train_err / train_inst, train_corr * 100 / train_total,
-            train_corr_nr * 100 / train_total_nr, time.time() - start_time)
+        print 'train: %d/%d loss: %.4f,  loss_org: %.4f, loss_linear: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time: %.2fs' % (
+            train_inst, train_inst, train_err / train_inst, train_err_org / train_inst, train_err_linear / train_inst,
+            train_corr * 100 / train_total, train_corr_nr * 100 / train_total_nr, time.time() - start_time)
 
         # evaluate performance on dev data
         dev_corr = 0.0
