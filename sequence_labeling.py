@@ -446,8 +446,9 @@ def main():
         if epoch in schedule:
             lr = lr * decay_rate
             updates = nesterov_momentum(loss_train, params=params, learning_rate=lr, momentum=momentum)
-            train_fn = theano.function([word_var, char_var, target_var, mask_var],
-                                       [loss_train, corr_train, num_tokens], updates=updates)
+            train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
+                                       [loss_train, loss_train_org, loss_train_expect_linear,
+                                        corr_train, corr_nr_train, num_tokens, num_tokens_nr], updates=updates)
 
 
 if __name__ == '__main__':
