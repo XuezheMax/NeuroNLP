@@ -302,6 +302,10 @@ def main():
     energies = nonlinearities.softmax(energies)
     energies_det = T.reshape(energies_train_det, (energy_shape[0] * energy_shape[1], energy_shape[2] * energy_shape[3]))
     energies_det = nonlinearities.softmax(energies_det)
+    # [batch*length, num_labels*num_labels] --> [batch, length*num_labels*num_labels]
+    energies = T.reshape(energies, (energy_shape[0], energy_shape[1] * energy_shape[2] * energy_shape[3]))
+    energies_det = T.reshape(energies_det, (energy_shape[0], energy_shape[1] * energy_shape[2] * energy_shape[3]))
+
     loss_train_expect_linear = lasagne.objectives.squared_error(energies, energies_det)
     loss_train_expect_linear = loss_train_expect_linear.sum(axis=1)
     loss_train_expect_linear = loss_train_expect_linear.mean()
