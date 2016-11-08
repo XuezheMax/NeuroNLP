@@ -336,8 +336,8 @@ def main():
 
     # Finally, launch the training loop.
     logger.info(
-        "Start training: regularization: %s(%f), dropout: %s (#training data: %d, batch size: %d, clip: %.1f)..." \
-        % (regular, (0.0 if regular == 'none' else gamma), dropout, num_data, batch_size, grad_clipping))
+        "Start training: regularization: %s(%f), dropout: %s, delta: %.2f (#training data: %d, batch size: %d, clip: %.1f)..." \
+        % (regular, (0.0 if regular == 'none' else gamma), dropout, delta, num_data, batch_size, grad_clipping))
 
     num_batches = num_data / batch_size + 1
     dev_correct = 0.0
