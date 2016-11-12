@@ -219,10 +219,10 @@ def decode_MST(energies, masks):
         while length < max_length and mask[length] > 0.5:
             length += 1
 
-        # calc real energy matrix shape = [length, length, num_labels - 1] (remove the label for root symbol).
-        energy = energy[:length, :length, 1:]
+        # calc real energy matrix shape = [length, length, num_labels - 2] (remove the label for root and pad symbol).
+        energy = energy[:length, :length, 2:]
         # get best label for each edge.
-        label_id_matrix = energy.argmax(axis=2)
+        label_id_matrix = energy.argmax(axis=2) + 2
         # get original score matrix
         orig_score_matrix = energy.max(axis=2)
         # initialize score matrix to original score matrix
@@ -255,7 +255,7 @@ def decode_MST(energies, masks):
         for ch, pr in final_edges.items():
             par[ch] = pr
             if ch != 0:
-                type[ch] = label_id_matrix[pr, ch] + 1
+                type[ch] = label_id_matrix[pr, ch]
 
         pars[i] = par
         types[i] = type

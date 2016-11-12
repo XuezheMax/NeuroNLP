@@ -20,7 +20,7 @@ from neuronlp import utils
 from neuronlp.layers.recurrent import LSTMLayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
 from neuronlp.layers.pool import PoolTimeStep1DLayer
-from neuronlp.layers.crf import TreeCRFLayer
+from neuronlp.layers.crf import TreeBiAffineCRFLayer
 from neuronlp.objectives import tree_crf_loss
 from neuronlp.tasks import parser
 
@@ -135,8 +135,10 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     bi_lstm_cnn = lasagne.layers.concat([lstm_forward, lstm_backward], axis=2, name="bi-lstm")
     # shape = [batch, n-step, num_units]
     bi_lstm_cnn = lasagne.layers.DropoutLayer(bi_lstm_cnn, p=p, shared_axes=(1,))
+    # shape [batch, n-step, num_units]
+    bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.tanh, num_leading_axes=2)
 
-    return TreeCRFLayer(bi_lstm_cnn, num_types, mask_input=mask)
+    return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask)
 
 
 def main():
@@ -249,13 +251,15 @@ def main():
         % (regular, (0.0 if regular == 'none' else gamma), dropout, delta, num_data, batch_size, grad_clipping))
 
     num_batches = num_data / batch_size + 1
-    dev_correct = 0.0
-    dev_correct_nr = 0.0
+    dev_ucorrect = 0.0
+    dev_lcorrect = 0.0
+    dev_ucorrect_nopunct = 0.0
+    dev_lcorrect_nopunct = 0.0
     best_epoch = 0
-    test_correct = 0.0
-    test_correct_nr = 0.0
+    test_ucorrect = 0.0
+    test_lcorrect = 0.0
     test_total = 0
-    test_total_nr = 0
+    test_total = 0
     test_inst = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
@@ -317,6 +321,24 @@ def main():
         print 'Wo Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%%' % (
             dev_ucorr_nopunc, dev_lcorr_nopunc, dev_total_nopunc, dev_ucorr_nopunc * 100 / dev_total_nopunc,
             dev_lcorr_nopunc * 100 / dev_total_nopunc)
+
+        if dev_ucorrect_nopunct < dev_ucorr_nopunc:
+            dev_ucorrect_nopunct = dev_ucorr_nopunc
+            dev_lcorrect_nopunct = dev_lcorr_nopunc
+            dev_ucorrect = dev_ucorr
+            dev_lcorrect = dev_lcorr
+            best_epoch = epoch
+        print 'best W. Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
+            dev_ucorrect, dev_lcorrect, dev_total, dev_ucorrect * 100 / dev_total, dev_lcorrect * 100 / dev_total,
+            best_epoch)
+        print 'best Wo Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
+            dev_ucorrect_nopunct, dev_lcorrect_nopunct, dev_total_nopunc, dev_ucorrect_nopunct * 100 / dev_total_nopunc,
+            dev_lcorrect_nopunct * 100 / dev_total_nopunc, best_epoch)
+
+        if epoch in schedule:
+            lr = lr * decay_rate
+            updates = nesterov_momentum(loss_train, params=params, learning_rate=lr, momentum=momentum)
+            train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
 
 
 if __name__ == '__main__':
