@@ -154,10 +154,7 @@ def tree_crf_loss(energies, heads, types, masks):
     length = input_shape[1]
     # get the exp of energies, and add along the label axis.
     # the shape is [batch_size, n, n].
-    const = 10
-    log_const = np.log(const)
     E = T.exp(energies).sum(axis=3)
-    E = E * const
 
     # zero out the elements out the length of each sentence.
     if masks is not None:
@@ -179,9 +176,8 @@ def tree_crf_loss(energies, heads, types, masks):
     L = D - E
 
     # compute partition Z(x)
-    partitions, _ = theano.scan(
-        fn=lambda laps, length: logabsdet(laps[1:length, 1:length]) - (length - 1) * log_const,
-        outputs_info=None, sequences=[L, lengths])
+    partitions, _ = theano.scan(fn=lambda laps, length: logabsdet(laps[1:length, 1:length]), outputs_info=None,
+                                sequences=[L, lengths])
 
     # compute targets energy
     # first create indice matrix
