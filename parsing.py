@@ -99,7 +99,7 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
 
     # dropout for incoming
-    incoming = lasagne.layers.DropoutLayer(layer_word_input, p=p, shared_axes=(1,))
+    incoming = lasagne.layers.DropoutLayer(layer_word_input, p=0.15, shared_axes=(1,))
 
     ingate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                           W_cell=lasagne.init.Uniform(range=0.1))
@@ -134,9 +134,9 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # concatenate the outputs of forward and backward LSTMs to combine them.
     bi_lstm_cnn = lasagne.layers.concat([lstm_forward, lstm_backward], axis=2, name="bi-lstm")
     # shape = [batch, n-step, num_units]
-    bi_lstm_cnn = lasagne.layers.DropoutLayer(bi_lstm_cnn, p=p, shared_axes=(1,))
+    bi_lstm_cnn = lasagne.layers.DropoutLayer(bi_lstm_cnn, p=0.33, shared_axes=(1,))
     # shape [batch, n-step, num_units]
-    bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.tanh, num_leading_axes=2)
+    bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu, num_leading_axes=2)
 
     return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask)
 
