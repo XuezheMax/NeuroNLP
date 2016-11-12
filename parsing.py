@@ -170,6 +170,8 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # concatenate the outputs of forward and backward LSTMs to combine them.
     bi_lstm_cnn = lasagne.layers.concat([lstm_forward2, lstm_backward2], axis=2, name="bi-lstm")
     # shape [batch, n-step, num_units]
+    bi_lstm_cnn = lasagne.layers.DropoutLayer(bi_lstm_cnn, p=0.33, shared_axes=(1,))
+    # shape [batch, n-step, num_units]
     bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu, num_leading_axes=2)
 
     return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask)
