@@ -166,7 +166,7 @@ def tree_crf_loss(energies, heads, types, masks):
     # compute the D tensor.
     # the shape is [batch_size, n, n]
     D = E.sum(axis=1)
-    D = T.zeros_like(E) + D.dimshuffle(0, 1, 'x')
+    D = T.ones_like(E) + D.dimshuffle(0, 1, 'x')
     # zeros out all elements except diagonal.
     D = D * T.eye(length, length, 0).dimshuffle('x', 0, 1)
 
@@ -176,7 +176,7 @@ def tree_crf_loss(energies, heads, types, masks):
     L = D - E
 
     # compute partition Z(x)
-    partitions, _ = theano.scan(fn=lambda laps, length: logabsdet(laps[1:length, 1:length]), outputs_info=None,
+    partitions, _ = theano.scan(fn=lambda laps, len: logabsdet(laps[1:len, 1:len]), outputs_info=None,
                                 sequences=[L, lengths])
 
     # compute targets energy
@@ -191,4 +191,4 @@ def tree_crf_loss(energies, heads, types, masks):
     # sum over n_step shape = [batch_size]
     target_energy = target_energy.sum(axis=1)
 
-    return partitions - target_energy  # , E, D, L, partitions, target_energy
+    return partitions - target_energy  , E, D, L, lengths #partitions, target_energy
