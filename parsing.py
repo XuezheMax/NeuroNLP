@@ -13,7 +13,7 @@ import theano
 import theano.tensor as T
 from lasagne.layers import Gate
 from lasagne import nonlinearities
-from lasagne.updates import nesterov_momentum
+from lasagne.updates import nesterov_momentum, adam
 
 from neuronlp.io import data_utils
 from neuronlp import utils
@@ -238,7 +238,7 @@ def main():
         loss_train = loss_train + gamma * l2_penalty
 
     params = lasagne.layers.get_all_params(network, trainable=True)
-    updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
+    updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
@@ -337,7 +337,7 @@ def main():
 
         if epoch in schedule:
             lr = lr * decay_rate
-            updates = nesterov_momentum(loss_train, params=params, learning_rate=lr, momentum=momentum)
+            updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
             train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
 
 
