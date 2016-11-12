@@ -160,7 +160,7 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # now use tanh for nonlinear function of cell, need to try pure linear cell
     cell_backward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                           nonlinearity=nonlinearities.tanh)
-    lstm_backward2 = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
+    lstm_backward2 = LSTMLayer(lstm_backward1, num_units, mask_input=mask, grad_clipping=grad_clipping,
                                nonlinearity=nonlinearities.tanh, peepholes=False, backwards=True,
                                ingate=ingate_backward2, outgate=outgate_backward2,
                                forgetgate=forgetgate_backward2, cell=cell_backward2, p=p, name='backward')
@@ -316,7 +316,7 @@ def main():
                     print E[i, 0:lengths[i], 0:lengths[i]]
                     print L[i, 1:lengths[i], 1:lengths[i]]
                     print '--------------------------'
-                    
+
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
