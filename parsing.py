@@ -312,7 +312,7 @@ def main():
             wids, _, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
             err, E, D, L, lengths = train_fn(wids, hids, tids, masks)
             for i in range(wids.shape[0]):
-                if lengths[i] < 4:
+                if lengths[i] < 3:
                     print "\n-------------------------"
                     print D[i, 0:lengths[i], 0:lengths[i]]
                     print E[i, 0:lengths[i], 0:lengths[i]]
