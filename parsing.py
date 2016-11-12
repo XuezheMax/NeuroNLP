@@ -101,40 +101,74 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # dropout for incoming
     incoming = lasagne.layers.DropoutLayer(layer_word_input, p=0.15, shared_axes=(1,))
 
-    ingate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    ingate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                           W_cell=lasagne.init.Uniform(range=0.1))
-    outgate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    outgate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                            W_cell=lasagne.init.Uniform(range=0.1))
     # according to Jozefowicz et al.(2015), init bias of forget gate to 1.
-    forgetgate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    forgetgate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                               W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
     # now use tanh for nonlinear function of cell, need to try pure linear cell
-    cell_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
+    cell_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                         nonlinearity=nonlinearities.tanh)
-    lstm_forward = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
+    lstm_forward1 = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
                              nonlinearity=nonlinearities.tanh, peepholes=False,
-                             ingate=ingate_forward, outgate=outgate_forward,
-                             forgetgate=forgetgate_forward, cell=cell_forward, p=p, name='forward')
+                             ingate=ingate_forward1, outgate=outgate_forward1,
+                             forgetgate=forgetgate_forward1, cell=cell_forward1, p=p, name='forward')
+    lstm_forward1 = lasagne.layers.DropoutLayer(lstm_forward1, p=0.33, shared_axes=(1,))
 
-    ingate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    ingate_forward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                            W_cell=lasagne.init.Uniform(range=0.1))
-    outgate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    outgate_forward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                             W_cell=lasagne.init.Uniform(range=0.1))
     # according to Jozefowicz et al.(2015), init bias of forget gate to 1.
-    forgetgate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    forgetgate_forward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                                W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
     # now use tanh for nonlinear function of cell, need to try pure linear cell
-    cell_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
+    cell_forward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                          nonlinearity=nonlinearities.tanh)
-    lstm_backward = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
+    lstm_forward2 = LSTMLayer(lstm_forward1, num_units, mask_input=mask, grad_clipping=grad_clipping,
+                              nonlinearity=nonlinearities.tanh, peepholes=False,
+                              ingate=ingate_forward2, outgate=outgate_forward2,
+                              forgetgate=forgetgate_forward2, cell=cell_forward2, p=p, name='forward')
+
+    # ----------------------------------------------------------------------------------------------------
+
+    ingate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                           W_cell=lasagne.init.Uniform(range=0.1))
+    outgate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                            W_cell=lasagne.init.Uniform(range=0.1))
+    # according to Jozefowicz et al.(2015), init bias of forget gate to 1.
+    forgetgate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                               W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
+    # now use tanh for nonlinear function of cell, need to try pure linear cell
+    cell_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
+                         nonlinearity=nonlinearities.tanh)
+    lstm_backward1 = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
                               nonlinearity=nonlinearities.tanh, peepholes=False, backwards=True,
-                              ingate=ingate_backward, outgate=outgate_backward,
-                              forgetgate=forgetgate_backward, cell=cell_backward, p=p, name='backward')
+                              ingate=ingate_backward1, outgate=outgate_backward1,
+                              forgetgate=forgetgate_backward1, cell=cell_backward1, p=p, name='backward')
+    lstm_backward1 = lasagne.layers.DropoutLayer(lstm_backward1, p=0.33, shared_axes=(1,))
+
+    ingate_backward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                            W_cell=lasagne.init.Uniform(range=0.1))
+    outgate_backward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                             W_cell=lasagne.init.Uniform(range=0.1))
+    # according to Jozefowicz et al.(2015), init bias of forget gate to 1.
+    forgetgate_backward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
+    # now use tanh for nonlinear function of cell, need to try pure linear cell
+    cell_backward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
+                          nonlinearity=nonlinearities.tanh)
+    lstm_backward2 = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
+                               nonlinearity=nonlinearities.tanh, peepholes=False, backwards=True,
+                               ingate=ingate_backward2, outgate=outgate_backward2,
+                               forgetgate=forgetgate_backward2, cell=cell_backward2, p=p, name='backward')
+
+    # -----------------------------------------------------------------------------------------------------------
 
     # concatenate the outputs of forward and backward LSTMs to combine them.
-    bi_lstm_cnn = lasagne.layers.concat([lstm_forward, lstm_backward], axis=2, name="bi-lstm")
-    # shape = [batch, n-step, num_units]
-    bi_lstm_cnn = lasagne.layers.DropoutLayer(bi_lstm_cnn, p=0.15, shared_axes=(1,))
+    bi_lstm_cnn = lasagne.layers.concat([lstm_forward2, lstm_backward2], axis=2, name="bi-lstm")
     # shape [batch, n-step, num_units]
     bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu, num_leading_axes=2)
 
