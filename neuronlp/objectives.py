@@ -175,8 +175,10 @@ def tree_crf_loss(energies, heads, types, masks):
     L = D - E
 
     # compute partition Z(x)
-    partitions, _ = theano.scan(fn=lambda laps, length: logabsdet(laps[1:length, 1:length]), outputs_info=None,
-                                sequences=[L, lengths])
+    epsilon = 1e-7
+    partitions, _ = theano.scan(
+        fn=lambda laps, length: logabsdet(laps[1:length, 1:length] + T.eye(length - 1, length - 1) * epsilon),
+        outputs_info=None, sequences=[L, lengths])
 
     # compute targets energy
     # first create indice matrix
