@@ -295,8 +295,10 @@ def main():
     best_epoch = 0
     test_ucorrect = 0.0
     test_lcorrect = 0.0
+    test_ucorrect_nopunct = 0.0
+    test_lcorrect_nopunct = 0.0
     test_total = 0
-    test_total = 0
+    test_total_nopunc = 0
     test_inst = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
@@ -308,7 +310,6 @@ def main():
         for batch in xrange(1, num_batches + 1):
             wids, _, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
             err = train_fn(wids, hids, tids, masks)
-
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
@@ -366,12 +367,51 @@ def main():
             dev_ucorrect = dev_ucorr
             dev_lcorrect = dev_lcorr
             best_epoch = epoch
-        print 'best W. Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
+
+            test_err = 0.0
+            test_ucorr = 0.0
+            test_lcorr = 0.0
+            test_ucorr_nopunc = 0.0
+            test_lcorr_nopunc = 0.0
+            test_total = 0
+            test_total_nopunc = 0
+            test_inst = 0
+            for batch in data_utils.iterate_batch(data_test, batch_size):
+                wids, _, pids, hids, tids, masks = batch
+                err, energies = eval_fn(wids, hids, tids, masks)
+                test_err += err * wids.shape[0]
+                pars_pred, types_pred = parser.decode_MST(energies, masks)
+                ucorr, lcorr, total, ucorr_nopunc, \
+                lcorr_nopunc, total_nopunc = parser.eval(wids, pids, pars_pred, types_pred, hids, tids, masks,
+                                                        tmp_dir + '/test_parse%d' % epoch, word_alphabet, pos_alphabet,
+                                                        type_alphabet, punct_set=punct_set)
+                test_inst += wids.shape[0]
+
+                test_ucorr += ucorr
+                test_lcorr += lcorr
+                test_total += total
+
+                test_ucorr_nopunc += ucorr_nopunc
+                test_lcorr_nopunc += lcorr_nopunc
+                test_total_nopunc += total_nopunc
+            test_ucorrect = test_ucorr
+            test_lcorrect = test_lcorr
+            test_ucorrect_nopunct = test_ucorr_nopunc
+            test_lcorrect_nopunct = test_lcorr_nopunc
+
+        print 'best dev  W. Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
             dev_ucorrect, dev_lcorrect, dev_total, dev_ucorrect * 100 / dev_total, dev_lcorrect * 100 / dev_total,
             best_epoch)
-        print 'best Wo Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
+        print 'best dev  Wo Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
             dev_ucorrect_nopunct, dev_lcorrect_nopunct, dev_total_nopunc, dev_ucorrect_nopunct * 100 / dev_total_nopunc,
             dev_lcorrect_nopunct * 100 / dev_total_nopunc, best_epoch)
+        print 'best test W. Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
+            test_ucorrect, test_lcorrect, test_total, test_ucorrect * 100 / test_total,
+            test_lcorrect * 100 / test_total, best_epoch)
+        print 'best test Wo Punct: ucorr: %d, lcorr: %d, total: %d, uas: %.2f%%, las: %.2f%% (epoch: %d)' % (
+            test_ucorrect_nopunct, test_lcorrect_nopunct, test_total_nopunc,
+            test_ucorrect_nopunct * 100 / test_total_nopunc, test_lcorrect_nopunct * 100 / test_total_nopunc,
+            best_epoch)
 
         if epoch in schedule:
             lr = lr * decay_rate
