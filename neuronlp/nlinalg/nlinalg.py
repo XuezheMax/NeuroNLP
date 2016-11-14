@@ -26,7 +26,6 @@ class LogAbsDet(Op):
 
     def make_node(self, x):
         x = as_tensor_variable(x)
-        # assert x is square
         assert x.ndim == 2
         o = theano.tensor.scalar(dtype=x.dtype)
         return Apply(self, [x], [o])
@@ -35,10 +34,6 @@ class LogAbsDet(Op):
         try:
             (x,) = inputs
             (z,) = outputs
-            rtol = 1e-6
-            atol = 1e-8
-            # make sure x is not singular
-            x = x + numpy.diag(numpy.abs(numpy.diagonal(x)) * rtol + atol)
             s = numpy.linalg.svd(x, compute_uv=False)
             log_abs_det = numpy.sum(numpy.log(numpy.abs(s)))
             z[0] = numpy.asarray(log_abs_det, dtype=x.dtype)
@@ -49,10 +44,6 @@ class LogAbsDet(Op):
     def grad(self, inputs, g_outputs):
         [gz] = g_outputs
         [x] = inputs
-        rtol = 1e-6
-        atol = 1e-8
-        # make sure x is not singular
-        x = x + numpy.diag(numpy.abs(numpy.diagonal(x)) * rtol + atol)
         return [gz * matrix_inverse(x).T]
 
     def __str__(self):
