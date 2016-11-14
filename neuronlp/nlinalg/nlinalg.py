@@ -28,7 +28,6 @@ class LogAbsDet(Op):
         x = as_tensor_variable(x)
         # assert x is square
         assert x.ndim == 2
-        assert x.shape[0] == x.shape[1]
         o = theano.tensor.scalar(dtype=x.dtype)
         return Apply(self, [x], [o])
 
