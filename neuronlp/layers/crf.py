@@ -203,7 +203,7 @@ class TreeBiAffineCRFLayer(MergeLayer):
     """
 
     def __init__(self, incoming, num_labels, mask_input=None, U=init.GlorotUniform(), W_h=init.GlorotUniform(),
-                 b=init.Constant(0.), **kwargs):
+                 W_c=init.GlorotUniform(), b=init.Constant(0.), **kwargs):
         # This layer inherits from a MergeLayer, because it can have two
         # inputs - the layer input, and the mask.
         # We will just provide the layer input as incomings, unless a mask input was provided.
@@ -221,7 +221,7 @@ class TreeBiAffineCRFLayer(MergeLayer):
         # add parameters
         self.U = self.add_param(U, (dim_inputs, dim_inputs, self.num_labels), name='U')
         self.W_h = self.add_param(W_h, (dim_inputs, self.num_labels), name='W_h')
-
+        self.W_c = self.add_param(W_c, (dim_inputs, self.num_labels), name='W_c')
 
         if b is None:
             self.b = None
@@ -267,6 +267,10 @@ class TreeBiAffineCRFLayer(MergeLayer):
             b_shuffled = self.b.dimshuffle('x', 'x', 0)
             s_h = s_h + b_shuffled
 
+        # compute child part by tensor dot ([batch, length, dim] * [dim, num_label]
+        # the shape of s_c should be [batch, length, num_label]
+        s_c = T.tensordot(input, self.W_c, axes=[[2], [0]])
+
         # compute the bi-affine part
         # first via tensor dot ([batch, length, dim] * [dim, dim, num_label])
         # output shape = [batch, length, dim, num_label]
@@ -277,6 +281,7 @@ class TreeBiAffineCRFLayer(MergeLayer):
         out = out.dimshuffle(0, 1, 3, 2)
         # add the head bias part
         out = out + s_h.dimshuffle(0, 1, 'x', 2)
+        out = out + s_c.dimshuffle(0, 'x', 1, 2)
 
         if mask is not None:
             mask_shuffled = mask.dimshuffle(0, 1, 'x', 'x')

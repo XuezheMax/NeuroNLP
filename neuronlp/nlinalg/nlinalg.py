@@ -31,14 +31,11 @@ class LogAbsDet(Op):
         return Apply(self, [x], [o])
 
     def perform(self, node, inputs, outputs, params=None):
-        # MAX = 10000.
-        # MIN = -10000.
         try:
             (x,) = inputs
             (z,) = outputs
             s = numpy.linalg.svd(x, compute_uv=False)
             log_abs_det = numpy.sum(numpy.log(numpy.abs(s)))
-            # numpy.clip(log_abs_det, MIN, MAX)
             z[0] = numpy.asarray(log_abs_det, dtype=x.dtype)
         except Exception:
             print('Failed to compute logabsdet of {}.'.format(x))
