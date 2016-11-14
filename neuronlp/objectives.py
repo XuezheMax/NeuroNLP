@@ -154,8 +154,8 @@ def tree_crf_loss(energies, heads, types, masks):
     length = input_shape[1]
     # get the exp of energies, and add along the label axis.
     # the shape is [batch_size, n, n].
-    InvI = 1 - T.eye(length, length, 0)
-    potentials = T.exp(energies) * InvI.dimshuffle('x', 0, 1, 'x')
+    I = T.eye(length, length, 0)
+    potentials = T.exp(T.switch(I.dimshuffle('x', 0, 1, 'x'), -np.inf, energies))
     E = potentials.sum(axis=3)
 
     # zero out the elements out the length of each sentence.
@@ -168,7 +168,7 @@ def tree_crf_loss(energies, heads, types, masks):
     # compute the D tensor.
     # the shape is [batch_size, n, n]
     D = E.sum(axis=1)
-    D = T.ones_like(E) + D.dimshuffle(0, 1, 'x')
+    D = T.zeros_like(E) + D.dimshuffle(0, 1, 'x')
     # zeros out all elements except diagonal.
     D = D * T.eye(length, length, 0).dimshuffle('x', 0, 1)
 

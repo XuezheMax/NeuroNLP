@@ -308,14 +308,6 @@ def main():
         for batch in xrange(1, num_batches + 1):
             wids, _, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
             err = train_fn(wids, hids, tids, masks)
-            # err, E, D, L, lengths = train_fn(wids, hids, tids, masks)
-            # for i in range(wids.shape[0]):
-            #     if lengths[i] < 3:
-            #         print "\n-------------------------"
-            #         print D[i, 0:lengths[i], 0:lengths[i]]
-            #         print E[i, 0:lengths[i], 0:lengths[i]]
-            #         print L[i, 1:lengths[i], 1:lengths[i]]
-            #         print '--------------------------'
 
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
