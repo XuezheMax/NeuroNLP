@@ -193,4 +193,4 @@ def tree_crf_loss(energies, heads, types, masks):
     # sum over n_step shape = [batch_size]
     target_energy = target_energy.sum(axis=1)
 
-    return partitions - target_energy , E, D, L, lengths #partitions, target_energy
+    return partitions - target_energy# , E, D, L, lengths #partitions, target_energy

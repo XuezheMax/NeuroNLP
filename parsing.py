@@ -259,18 +259,15 @@ def main():
 
     logger.info("Network structure: hidden=%d, filter=%d, dropout=%s" % (num_units, num_filters, dropout))
     # compute loss
-    # num_tokens = mask_var.sum(dtype=theano.config.floatX)
-
-    # get outpout of bi-lstm-cnn-crf shape [batch, length, num_labels, num_labels]
     energies_train = lasagne.layers.get_output(network)
     energies_eval = lasagne.layers.get_output(network, deterministic=True)
 
-    # loss_train = tree_crf_loss(energies_train, head_var, type_var, mask_var).mean()
-    # loss_eval = tree_crf_loss(energies_eval, head_var, type_var, mask_var).mean()
-    loss_train, E, D, L, lengths = tree_crf_loss(energies_train, head_var, type_var, mask_var)
-    loss_train = loss_train.mean()
-    loss_eval, _, _, _, _ = tree_crf_loss(energies_eval, head_var, type_var, mask_var)
-    loss_eval = loss_eval.mean()
+    loss_train = tree_crf_loss(energies_train, head_var, type_var, mask_var).mean()
+    loss_eval = tree_crf_loss(energies_eval, head_var, type_var, mask_var).mean()
+    # loss_train, E, D, L, lengths = tree_crf_loss(energies_train, head_var, type_var, mask_var)
+    # loss_train = loss_train.mean()
+    # loss_eval, _, _, _, _ = tree_crf_loss(energies_eval, head_var, type_var, mask_var)
+    # loss_eval = loss_eval.mean()
 
     # l2 regularization?
     if regular == 'l2':
@@ -281,7 +278,7 @@ def main():
     updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, head_var, type_var, mask_var], [loss_train, E, D, L, lengths], updates=updates)
+    train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
     # Compile a second function evaluating the loss and accuracy of network
     eval_fn = theano.function([word_var, head_var, type_var, mask_var], [loss_eval, energies_eval])
 
@@ -310,14 +307,15 @@ def main():
         num_back = 0
         for batch in xrange(1, num_batches + 1):
             wids, _, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
-            err, E, D, L, lengths = train_fn(wids, hids, tids, masks)
-            for i in range(wids.shape[0]):
-                if lengths[i] < 3:
-                    print "\n-------------------------"
-                    print D[i, 0:lengths[i], 0:lengths[i]]
-                    print E[i, 0:lengths[i], 0:lengths[i]]
-                    print L[i, 1:lengths[i], 1:lengths[i]]
-                    print '--------------------------'
+            err = train_fn(wids, hids, tids, masks)
+            # err, E, D, L, lengths = train_fn(wids, hids, tids, masks)
+            # for i in range(wids.shape[0]):
+            #     if lengths[i] < 3:
+            #         print "\n-------------------------"
+            #         print D[i, 0:lengths[i], 0:lengths[i]]
+            #         print E[i, 0:lengths[i], 0:lengths[i]]
+            #         print L[i, 1:lengths[i], 1:lengths[i]]
+            #         print '--------------------------'
 
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
