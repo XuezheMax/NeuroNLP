@@ -351,7 +351,7 @@ def main():
         num_back = 0
         for batch in xrange(1, num_batches + 1):
             wids, cids, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
-            err = train_fn(wids, cids, hids, tids, masks)
+            err = train_fn(wids, cids, pids, hids, tids, masks)
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
@@ -380,7 +380,7 @@ def main():
         dev_inst = 0
         for batch in data_utils.iterate_batch(data_dev, batch_size):
             wids, cids, pids, hids, tids, masks = batch
-            err, energies = eval_fn(wids, cids, hids, tids, masks)
+            err, energies = eval_fn(wids, cids, pids, hids, tids, masks)
             dev_err += err * wids.shape[0]
             pars_pred, types_pred = parser.decode_MST(energies, masks)
             ucorr, lcorr, total, ucorr_nopunc, \
@@ -420,7 +420,7 @@ def main():
             test_inst = 0
             for batch in data_utils.iterate_batch(data_test, batch_size):
                 wids, cids, pids, hids, tids, masks = batch
-                err, energies = eval_fn(wids, cids, hids, tids, masks)
+                err, energies = eval_fn(wids, cids, pids, hids, tids, masks)
                 test_err += err * wids.shape[0]
                 pars_pred, types_pred = parser.decode_MST(energies, masks)
                 ucorr, lcorr, total, ucorr_nopunc, \
