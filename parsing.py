@@ -17,6 +17,7 @@ from lasagne.updates import nesterov_momentum, adam
 
 from neuronlp.io import data_utils
 from neuronlp import utils
+from neuronlp.layers import get_all_params_by_name
 from neuronlp.layers.recurrent import LSTMLayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
 from neuronlp.layers.pool import PoolTimeStep1DLayer
@@ -174,7 +175,7 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # shape [batch, n-step, num_units]
     bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu, num_leading_axes=2)
 
-    return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask)
+    return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask, name='crf')
 
 
 def main():
@@ -186,6 +187,7 @@ def main():
     args_parser.add_argument('--learning_rate', type=float, default=0.1, help='Learning rate')
     args_parser.add_argument('--decay_rate', type=float, default=0.1, help='Decay rate of learning rate')
     args_parser.add_argument('--grad_clipping', type=float, default=0, help='Gradient clipping')
+    args_parser.add_argument('--max_norm', type=float, default=4.0, help='weight for max-norm regularization')
     args_parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
     args_parser.add_argument('--delta', type=float, default=0.0, help='weight for expectation-linear regularization')
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
@@ -212,6 +214,7 @@ def main():
     grad_clipping = args.grad_clipping
     gamma = args.gamma
     delta = args.delta
+    max_norm = args.max_norm
     learning_rate = args.learning_rate
     momentum = 0.9
     decay_rate = args.decay_rate
@@ -276,6 +279,12 @@ def main():
 
     params = lasagne.layers.get_all_params(network, trainable=True)
     updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
+    params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
+    assert len(params_constraint) == 3
+    for param in params_constraint:
+        assert param in updates
+        norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
+        updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
@@ -416,6 +425,12 @@ def main():
         if epoch in schedule:
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
+            params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
+            assert len(params_constraint) == 3
+            for param in params_constraint:
+                assert param in updates
+                norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
+                updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
             train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
 
 
