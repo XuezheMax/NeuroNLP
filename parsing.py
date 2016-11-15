@@ -279,7 +279,7 @@ def main():
         loss_train = loss_train + gamma * l2_penalty
 
     params = lasagne.layers.get_all_params(network, trainable=True)
-    updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
+    updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.999)
     if max_norm:
         params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
         assert len(params_constraint) == 3
@@ -425,7 +425,7 @@ def main():
 
         if epoch in schedule:
             lr = lr * decay_rate
-            updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
+            updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.999)
             if max_norm:
                 params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'],
                                                            trainable=True)
