@@ -260,7 +260,7 @@ def main():
         punct_set = set(punctuation.split())
         logger.info("punctuations: %s" % ' '.join(punct_set))
 
-    logger.info("Creating Alphabets")
+    logger.info("Creating Alphabets: normalize_digits=%s" % normalize_digits)
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
                                                                                             [train_path, dev_path,
                                                                                              test_path],
