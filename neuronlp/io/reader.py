@@ -50,17 +50,9 @@ class CoNLLReader(object):
         heads.append(-1)
 
         for tokens in lines:
-            word = data_utils.DIGIT_RE.sub(b"0", tokens[1]) if normalize_digits else tokens[1]
-            pos = tokens[4]
-            head = int(tokens[6])
-            type = tokens[7]
-
-            words.append(word)
-            word_ids.append(self.__word_alphabet.get_index(word))
-
             chars = []
             char_ids = []
-            for char in word:
+            for char in tokens[1]:
                 chars.append(char)
                 char_ids.append(self.__char_alphabet.get_index(char))
             if len(chars) > data_utils.MAX_CHAR_LENGTH:
@@ -68,6 +60,14 @@ class CoNLLReader(object):
                 char_ids = char_ids[:data_utils.MAX_CHAR_LENGTH]
             char_seqs.append(chars)
             char_id_seqs.append(char_ids)
+
+            word = data_utils.DIGIT_RE.sub(b"0", tokens[1]) if normalize_digits else tokens[1]
+            pos = tokens[4]
+            head = int(tokens[6])
+            type = tokens[7]
+
+            words.append(word)
+            word_ids.append(self.__word_alphabet.get_index(word))
 
             postags.append(pos)
             pos_ids.append(self.__pos_alphabet.get_index(pos))

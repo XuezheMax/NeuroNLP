@@ -59,12 +59,13 @@ def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, normal
                         continue
 
                     tokens = line.split()
+                    for char in tokens[1]:
+                        char_alphabet.add(char)
+
                     word = DIGIT_RE.sub(b"0", tokens[1]) if normalize_digits else tokens[1]
                     pos = tokens[4]
                     type = tokens[7]
 
-                    for char in word:
-                        char_alphabet.add(char)
                     pos_alphabet.add(pos)
                     type_alphabet.add(type)
 
@@ -74,6 +75,7 @@ def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, normal
                         vocab[word] = 1
 
         vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
+        vocab_list = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > 1]
         logger.info("Total Vocabulary Size: %d" % len(vocab_list))
 
         if len(vocab_list) > max_vocabulary_size:
