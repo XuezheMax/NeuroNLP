@@ -283,7 +283,7 @@ def main():
 
     num_data = sum([len(bucket) for bucket in data_train])
 
-    logger.info("constructing network...(pos embedding=%s, character embedding=%s)" % use_pos, use_char)
+    logger.info("constructing network...(pos embedding=%s, character embedding=%s)" % (use_pos, use_char))
     # create variables
     head_var = T.imatrix(name='heads')
     type_var = T.imatrix(name='types')
