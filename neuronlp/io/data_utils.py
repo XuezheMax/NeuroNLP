@@ -184,7 +184,7 @@ def iterate_batch(data, batch_size, shuffle=False):
     if shuffle:
         np.random.shuffle((bucket_indices))
 
-    for bucket_id, in bucket_indices:
+    for bucket_id in bucket_indices:
         bucket_size = bucket_sizes[bucket_id]
         if bucket_size == 0:
             continue
