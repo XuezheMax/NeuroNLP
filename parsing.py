@@ -31,7 +31,8 @@ CHARACTER_DIM = 50
 
 
 def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
-                  num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, use_char=False, use_pos=False):
+                  num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, use_char=False, use_pos=False,
+                  normalize_digits=True):
     def generate_random_embedding(scale, shape):
         return np.random.uniform(-scale, scale, shape).astype(theano.config.floatX)
 
@@ -68,9 +69,8 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
         layer_pos_input = lasagne.layers.InputLayer(shape=(None, None), input_var=pos_var, name='pos_input')
         # shape = [batch, n-step, w_dim]
         layer_pos_embedding = lasagne.layers.EmbeddingLayer(layer_pos_input, input_size=pos_alphabet.size(),
-                                                             output_size=POS_DIM, W=pos_table, name='pos_embedd')
+                                                            output_size=POS_DIM, W=pos_table, name='pos_embedd')
         return layer_pos_embedding
-
 
     def construct_char_input_layer():
         # shape = [batch, n-step, char_length]
@@ -85,7 +85,8 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
         layer_char_embedding = lasagne.layers.DimshuffleLayer(layer_char_embedding, pattern=(0, 1, 3, 2))
         return layer_char_embedding
 
-    embedd_dict, embedd_dim, caseless = utils.load_word_embedding_dict('glove', "data/glove/glove.6B/glove.6B.100d.gz")
+    embedd_dict, embedd_dim, caseless = utils.load_word_embedding_dict('glove', "data/glove/glove.6B/glove.6B.100d.gz",
+                                                                       normalize_digits=normalize_digits)
     assert embedd_dim == WORD_DIM
 
     word_table = construct_word_embedding_table()
@@ -108,7 +109,7 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
         # construct convolution layer
         # shape = [batch, n-step, c_filters, output_length]
         cnn_layer = ConvTimeStep1DLayer(layer_char_input, num_filters=num_filters, filter_size=conv_window, pad='full',
-                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+                                        nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
         # infer the pool size for pooling (pool size should go through all time step of cnn)
         _, _, _, pool_size = cnn_layer.output_shape
         # construct max pool layer
@@ -217,6 +218,7 @@ def main():
     args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay')
     args_parser.add_argument('--pos', action='store_true', help='using pos embedding')
     args_parser.add_argument('--char', action='store_true', help='using cnn for character embedding')
+    args_parser.add_argument('--normalize_digits', action='store_true', help='normalize digits')
     args_parser.add_argument('--output_prediction', action='store_true', help='Output predictions to temp files')
     args_parser.add_argument('--punctuation', default=None, help='List of punctuations separated by whitespace')
     args_parser.add_argument('--train', help='path of training data')
@@ -247,6 +249,7 @@ def main():
     schedule = args.schedule
     use_pos = args.pos
     use_char = args.char
+    normalize_digits = args.normalize_digits
     output_predict = args.output_prediction
     dropout = args.dropout
     punctuation = args.punctuation
@@ -261,7 +264,7 @@ def main():
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
                                                                                             [train_path, dev_path,
                                                                                              test_path],
-                                                                                            40000)
+                                                                                            40000, normalize_digits)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     logger.info("Character Alphabet Size: %d" % char_alphabet.size())
     logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
@@ -271,9 +274,12 @@ def main():
     num_types = type_alphabet.size()
 
     logger.info("Reading Data")
-    data_train = data_utils.read_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
-    data_dev = data_utils.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
-    data_test = data_utils.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet)
+    data_train = data_utils.read_data(train_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
+                                      normalize_digits=normalize_digits)
+    data_dev = data_utils.read_data(dev_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
+                                    normalize_digits=normalize_digits)
+    data_test = data_utils.read_data(test_path, word_alphabet, char_alphabet, pos_alphabet, type_alphabet,
+                                     normalize_digits=normalize_digits)
 
     num_data = sum([len(bucket) for bucket in data_train])
 
@@ -288,7 +294,7 @@ def main():
 
     network = build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
                             num_units, num_types, grad_clipping, num_filters, p=dropout,
-                            use_char=use_char, use_pos=use_pos)
+                            use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits)
 
     logger.info("Network structure: hidden=%d, filter=%d, dropout=%s, max-norm=%s, delta=%.2f" % (
         num_units, num_filters, dropout, max_norm, delta))
