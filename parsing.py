@@ -242,7 +242,7 @@ def main():
     learning_rate = args.learning_rate
     momentum = 0.9
     beta1 = 0.9
-    beta2 = 0.999
+    beta2 = 0.9
     decay_rate = args.decay_rate
     schedule = args.schedule
     use_pos = args.pos
