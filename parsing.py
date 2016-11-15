@@ -261,10 +261,9 @@ def main():
         logger.info("punctuations: %s" % ' '.join(punct_set))
 
     logger.info("Creating Alphabets: normalize_digits=%s" % normalize_digits)
-    word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
-                                                                                            [train_path, dev_path,
-                                                                                             test_path],
-                                                                                            40000, normalize_digits)
+    word_alphabet, char_alphabet, \
+    pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/", [train_path, dev_path, test_path],
+                                                              40000, normalize_digits=normalize_digits)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     logger.info("Character Alphabet Size: %d" % char_alphabet.size())
     logger.info("POS Alphabet Size: %d" % pos_alphabet.size())

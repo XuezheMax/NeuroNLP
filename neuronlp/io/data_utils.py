@@ -31,7 +31,7 @@ DIGIT_RE = re.compile(br"\d")
 _buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
 
 
-def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, normalize_digits=True):
+def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, min_occurence=1, normalize_digits=True):
     logger = get_logger("Create Alphabets")
     word_alphabet = Alphabet('word')
     char_alphabet = Alphabet('character')
@@ -75,7 +75,7 @@ def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, normal
                         vocab[word] = 1
 
         vocab_list = _START_VOCAB + sorted(vocab, key=vocab.get, reverse=True)
-        vocab_list = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > 1]
+        vocab_list = [word for word in vocab_list if word in _START_VOCAB or vocab[word] > min_occurence]
         logger.info("Total Vocabulary Size: %d" % len(vocab_list))
 
         if len(vocab_list) > max_vocabulary_size:
