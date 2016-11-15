@@ -187,7 +187,7 @@ def main():
     args_parser.add_argument('--learning_rate', type=float, default=0.1, help='Learning rate')
     args_parser.add_argument('--decay_rate', type=float, default=0.1, help='Decay rate of learning rate')
     args_parser.add_argument('--grad_clipping', type=float, default=0, help='Gradient clipping')
-    args_parser.add_argument('--max_norm', type=float, default=4.0, help='weight for max-norm regularization')
+    args_parser.add_argument('--max_norm', type=float, default=0, help='weight for max-norm regularization')
     args_parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
     args_parser.add_argument('--delta', type=float, default=0.0, help='weight for expectation-linear regularization')
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
@@ -280,12 +280,13 @@ def main():
 
     params = lasagne.layers.get_all_params(network, trainable=True)
     updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
-    params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
-    assert len(params_constraint) == 3
-    for param in params_constraint:
-        assert param in updates
-        norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
-        updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
+    if max_norm:
+        params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
+        assert len(params_constraint) == 3
+        for param in params_constraint:
+            assert param in updates
+            norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
+            updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], loss_train, updates=updates)
@@ -425,13 +426,16 @@ def main():
         if epoch in schedule:
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
-            params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
-            assert len(params_constraint) == 3
-            for param in params_constraint:
-                assert param in updates
-                norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
-                updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
-            train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
+            if max_norm:
+                params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'],
+                                                           trainable=True)
+                assert len(params_constraint) == 3
+                for param in params_constraint:
+                    assert param in updates
+                    norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
+                    updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm,
+                                                                     norm_axes=norm_axes)
+            train_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], loss_train, updates=updates)
 
 
 if __name__ == '__main__':
