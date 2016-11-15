@@ -214,6 +214,7 @@ def main():
     args_parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
     args_parser.add_argument('--delta', type=float, default=0.0, help='weight for expectation-linear regularization')
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
+    args_parser.add_argument('--opt', choices=['adam', 'momentum'], help='optimization algorithm', required=True)
     args_parser.add_argument('--dropout', type=float, default=0.5, help='dropout rate')
     args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay')
     args_parser.add_argument('--pos', action='store_true', help='using pos embedding')
@@ -237,6 +238,7 @@ def main():
     num_units = args.num_units
     num_filters = args.num_filters
     regular = args.regular
+    opt = args.opt
     grad_clipping = args.grad_clipping
     gamma = args.gamma
     delta = args.delta
@@ -314,7 +316,12 @@ def main():
         loss_train = loss_train + gamma * l2_penalty
 
     params = lasagne.layers.get_all_params(network, trainable=True)
-    updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
+    if opt == 'adam':
+        updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
+    elif opt == 'momentum':
+        updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
+    else:
+        raise ValueError('unkown optimization algorithm: %s' % opt)
     if max_norm:
         params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
         assert len(params_constraint) == 4
@@ -462,7 +469,12 @@ def main():
 
         if epoch in schedule:
             lr = lr * decay_rate
-            updates = adam(loss_train, params=params, learning_rate=lr, beta1=beta1, beta2=beta2)
+            if opt == 'adam':
+                updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
+            elif opt == 'momentum':
+                updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
+            else:
+                raise ValueError('unkown optimization algorithm: %s' % opt)
             if max_norm:
                 params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
                 assert len(params_constraint) == 4

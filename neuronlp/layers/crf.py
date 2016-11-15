@@ -220,8 +220,8 @@ class TreeBiAffineCRFLayer(MergeLayer):
 
         # add parameters
         self.U = self.add_param(U, (dim_inputs, dim_inputs, self.num_labels), name='U')
-        self.W_h = self.add_param(W_h, (dim_inputs, self.num_labels), name='W_h')
-        self.W_c = self.add_param(W_c, (dim_inputs, self.num_labels), name='W_c')
+        self.W_h = None if W_h is None else self.add_param(W_h, (dim_inputs, self.num_labels), name='W_h')
+        self.W_c = None if W_c is None else self.add_param(W_c, (dim_inputs, self.num_labels), name='W_c')
 
         if b is None:
             self.b = None
@@ -259,18 +259,6 @@ class TreeBiAffineCRFLayer(MergeLayer):
         if self.mask_incoming_index > 0:
             mask = inputs[self.mask_incoming_index]
 
-        # compute head bias part by tensor dot ([batch, length, dim] * [dim, num_label])
-        # the shape of s_h should be [batch, length, num_label]
-        s_h = T.tensordot(input, self.W_h, axes=[[2], [0]])
-
-        if self.b is not None:
-            b_shuffled = self.b.dimshuffle('x', 'x', 0)
-            s_h = s_h + b_shuffled
-
-        # compute child part by tensor dot ([batch, length, dim] * [dim, num_label]
-        # the shape of s_c should be [batch, length, num_label]
-        s_c = T.tensordot(input, self.W_c, axes=[[2], [0]])
-
         # compute the bi-affine part
         # first via tensor dot ([batch, length, dim] * [dim, dim, num_label])
         # output shape = [batch, length, dim, num_label]
@@ -279,9 +267,22 @@ class TreeBiAffineCRFLayer(MergeLayer):
         # output shape = [batch, length, length, num_label]
         out = T.batched_tensordot(out, input.dimshuffle(0, 2, 1), axes=([2], [1]))
         out = out.dimshuffle(0, 1, 3, 2)
-        # add the head bias part
-        out = out + s_h.dimshuffle(0, 1, 'x', 2)
-        out = out + s_c.dimshuffle(0, 'x', 1, 2)
+
+        # compute head bias part by tensor dot ([batch, length, dim] * [dim, num_label])
+        # the shape of s_h should be [batch, length, num_label]
+        if self.W_h is not None:
+            s_h = T.tensordot(input, self.W_h, axes=[[2], [0]])
+            out = out + s_h.dimshuffle(0, 1, 'x', 2)
+
+        # compute child part by tensor dot ([batch, length, dim] * [dim, num_label]
+        # the shape of s_c should be [batch, length, num_label]
+        if self.W_c is not None:
+            s_c = T.tensordot(input, self.W_c, axes=[[2], [0]])
+            out = out + s_c.dimshuffle(0, 'x', 1, 2)
+
+        # add bias part.
+        if self.b is not None:
+            out = out + self.b.dimshuffle('x', 'x', 'x', 0)
 
         if mask is not None:
             mask_shuffled = mask.dimshuffle(0, 1, 'x', 'x')
