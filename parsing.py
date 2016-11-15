@@ -15,7 +15,7 @@ from lasagne.layers import Gate
 from lasagne import nonlinearities
 from lasagne.updates import nesterov_momentum, adam, total_norm_constraint
 
-from neuronlp.io import data_utils
+from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
 from neuronlp.layers import get_all_params_by_name
 from neuronlp.layers.recurrent import LSTMLayer
@@ -226,7 +226,7 @@ def main():
 
     args = args_parser.parse_args()
 
-    logger = utils.get_logger("Parsing")
+    logger = get_logger("Parsing")
     train_path = args.train
     dev_path = args.dev
     test_path = args.test

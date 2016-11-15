@@ -5,8 +5,7 @@ Alphabet maps objects to integer ids. It provides two way mapping from the index
 """
 import json
 import os
-from .. import utils
-
+from .logger import get_logger
 
 class Alphabet(object):
     def __init__(self, name, keep_growing=True):
@@ -20,7 +19,7 @@ class Alphabet(object):
         self.default_index = 0
         self.next_index = 1
 
-        self.logger = utils.get_logger('Alphabet')
+        self.logger = get_logger('Alphabet')
 
     def add(self, instance):
         if instance not in self.instance2index:

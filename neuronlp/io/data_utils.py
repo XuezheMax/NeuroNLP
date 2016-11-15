@@ -4,9 +4,9 @@ import os.path
 import re
 import random
 import numpy as np
-from reader import CoNLLReader
-from alphabet import Alphabet
-from .. import utils
+from .reader import CoNLLReader
+from .alphabet import Alphabet
+from .logger import get_logger
 
 # Special vocabulary symbols - we always put them at the start.
 ROOT = b"_ROOT"
@@ -32,7 +32,7 @@ _buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
 
 
 def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, normalize_digits=True):
-    logger = utils.get_logger("Create Alphabets")
+    logger = get_logger("Create Alphabets")
     word_alphabet = Alphabet('word')
     char_alphabet = Alphabet('character')
     pos_alphabet = Alphabet('pos')

@@ -15,7 +15,7 @@ from lasagne.layers import Gate
 from lasagne import nonlinearities
 from lasagne.updates import nesterov_momentum
 
-from neuronlp.io import data_utils
+from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
 from neuronlp.layers.recurrent import LSTMLayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
@@ -235,7 +235,7 @@ def main():
 
     args = parser.parse_args()
 
-    logger = utils.get_logger("Sequence Labeling")
+    logger = get_logger("Sequence Labeling")
     train_path = args.train
     dev_path = args.dev
     test_path = args.test
