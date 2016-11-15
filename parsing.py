@@ -288,9 +288,9 @@ def main():
         updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, head_var, type_var, mask_var], loss_train, updates=updates)
+    train_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], loss_train, updates=updates)
     # Compile a second function evaluating the loss and accuracy of network
-    eval_fn = theano.function([word_var, head_var, type_var, mask_var], [loss_eval, energies_eval])
+    eval_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], [loss_eval, energies_eval])
 
     # Finally, launch the training loop.
     logger.info("Start training: regularization: %s(%f) (#training data: %d, batch size: %d, clip: %.1f)..." % (
@@ -317,8 +317,8 @@ def main():
         start_time = time.time()
         num_back = 0
         for batch in xrange(1, num_batches + 1):
-            wids, _, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
-            err = train_fn(wids, hids, tids, masks)
+            wids, cids, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
+            err = train_fn(wids, cids, hids, tids, masks)
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
@@ -346,8 +346,8 @@ def main():
         dev_total_nopunc = 0
         dev_inst = 0
         for batch in data_utils.iterate_batch(data_dev, batch_size):
-            wids, _, pids, hids, tids, masks = batch
-            err, energies = eval_fn(wids, hids, tids, masks)
+            wids, cids, pids, hids, tids, masks = batch
+            err, energies = eval_fn(wids, cids, hids, tids, masks)
             dev_err += err * wids.shape[0]
             pars_pred, types_pred = parser.decode_MST(energies, masks)
             ucorr, lcorr, total, ucorr_nopunc, \
@@ -386,8 +386,8 @@ def main():
             test_total_nopunc = 0
             test_inst = 0
             for batch in data_utils.iterate_batch(data_test, batch_size):
-                wids, _, pids, hids, tids, masks = batch
-                err, energies = eval_fn(wids, hids, tids, masks)
+                wids, cids, pids, hids, tids, masks = batch
+                err, energies = eval_fn(wids, cids, hids, tids, masks)
                 test_err += err * wids.shape[0]
                 pars_pred, types_pred = parser.decode_MST(energies, masks)
                 ucorr, lcorr, total, ucorr_nopunc, \
