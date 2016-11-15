@@ -76,46 +76,46 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     word_table = construct_word_embedding_table()
     char_table = construct_char_embedding_table()
 
-    # layer_char_input = construct_char_input_layer()
+    layer_char_input = construct_char_input_layer()
     layer_word_input = construct_word_input_layer()
     mask = lasagne.layers.InputLayer(shape=(None, None), input_var=mask_var, name='mask')
 
     # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
-    # conv_window = 3
-    # # shape = [batch, n-step, c_dim, char_length]
-    # # construct convolution layer
-    # # shape = [batch, n-step, c_filters, output_length]
-    # cnn_layer = ConvTimeStep1DLayer(incoming1, num_filters=num_filters, filter_size=conv_window, pad='full',
-    #                                 nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
-    # # infer the pool size for pooling (pool size should go through all time step of cnn)
-    # _, _, _, pool_size = cnn_layer.output_shape
-    # # construct max pool layer
-    # # shape = [batch, n-step, c_filters, 1]
-    # pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
-    # # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
-    # output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
-    #
-    # # finally, concatenate the two incoming layers together.
-    # # shape = [batch, n-step, c_filter&w_dim]
-    # incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
+    conv_window = 3
+    # shape = [batch, n-step, c_dim, char_length]
+    # construct convolution layer
+    # shape = [batch, n-step, c_filters, output_length]
+    cnn_layer = ConvTimeStep1DLayer(layer_char_input, num_filters=num_filters, filter_size=conv_window, pad='full',
+                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+    # infer the pool size for pooling (pool size should go through all time step of cnn)
+    _, _, _, pool_size = cnn_layer.output_shape
+    # construct max pool layer
+    # shape = [batch, n-step, c_filters, 1]
+    pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
+    # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
+    output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+
+    # finally, concatenate the two incoming layers together.
+    # shape = [batch, n-step, c_filter&w_dim]
+    incoming = lasagne.layers.concat([output_cnn_layer, layer_word_input], axis=2)
 
     # dropout for incoming
-    incoming = lasagne.layers.DropoutLayer(layer_word_input, p=0.15, shared_axes=(1,))
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.15, shared_axes=(1,))
 
     ingate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
-                          W_cell=lasagne.init.Uniform(range=0.1))
-    outgate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                            W_cell=lasagne.init.Uniform(range=0.1))
+    outgate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                            W_cell=lasagne.init.Uniform(range=0.1))
     # according to Jozefowicz et al.(2015), init bias of forget gate to 1.
     forgetgate_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
-                              W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
+                               W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
     # now use tanh for nonlinear function of cell, need to try pure linear cell
     cell_forward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
-                        nonlinearity=nonlinearities.tanh)
+                         nonlinearity=nonlinearities.tanh)
     lstm_forward1 = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
-                             nonlinearity=nonlinearities.tanh, peepholes=False,
-                             ingate=ingate_forward1, outgate=outgate_forward1,
-                             forgetgate=forgetgate_forward1, cell=cell_forward1, p=p, name='forward')
+                              nonlinearity=nonlinearities.tanh, peepholes=False,
+                              ingate=ingate_forward1, outgate=outgate_forward1,
+                              forgetgate=forgetgate_forward1, cell=cell_forward1, p=p, name='forward')
     lstm_forward1 = lasagne.layers.DropoutLayer(lstm_forward1, p=0.33, shared_axes=(1,))
 
     ingate_forward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
@@ -136,19 +136,19 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     # ----------------------------------------------------------------------------------------------------
 
     ingate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
-                           W_cell=lasagne.init.Uniform(range=0.1))
-    outgate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                             W_cell=lasagne.init.Uniform(range=0.1))
+    outgate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                             W_cell=lasagne.init.Uniform(range=0.1))
     # according to Jozefowicz et al.(2015), init bias of forget gate to 1.
     forgetgate_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
-                               W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
+                                W_cell=lasagne.init.Uniform(range=0.1), b=lasagne.init.Constant(1.))
     # now use tanh for nonlinear function of cell, need to try pure linear cell
     cell_backward1 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
-                         nonlinearity=nonlinearities.tanh)
+                          nonlinearity=nonlinearities.tanh)
     lstm_backward1 = LSTMLayer(incoming, num_units, mask_input=mask, grad_clipping=grad_clipping,
-                              nonlinearity=nonlinearities.tanh, peepholes=False, backwards=True,
-                              ingate=ingate_backward1, outgate=outgate_backward1,
-                              forgetgate=forgetgate_backward1, cell=cell_backward1, p=p, name='backward')
+                               nonlinearity=nonlinearities.tanh, peepholes=False, backwards=True,
+                               ingate=ingate_backward1, outgate=outgate_backward1,
+                               forgetgate=forgetgate_backward1, cell=cell_backward1, p=p, name='backward')
     lstm_backward1 = lasagne.layers.DropoutLayer(lstm_backward1, p=0.33, shared_axes=(1,))
 
     ingate_backward2 = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
@@ -255,12 +255,13 @@ def main():
     type_var = T.imatrix(name='types')
     mask_var = T.matrix(name='masks', dtype=theano.config.floatX)
     word_var = T.imatrix(name='inputs')
-    char_var = None  # T.itensor3(name='char-inputs')
+    char_var = T.itensor3(name='char-inputs')
 
     network = build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, num_units, num_types,
                             grad_clipping, num_filters, p=dropout)
 
-    logger.info("Network structure: hidden=%d, filter=%d, dropout=%s" % (num_units, num_filters, dropout))
+    logger.info("Network structure: hidden=%d, filter=%d, dropout=%s, max-norm=%s, delta=%.2f" % (
+        num_units, num_filters, dropout, max_norm, delta))
     # compute loss
     energies_train = lasagne.layers.get_output(network)
     energies_eval = lasagne.layers.get_output(network, deterministic=True)
@@ -292,9 +293,8 @@ def main():
     eval_fn = theano.function([word_var, head_var, type_var, mask_var], [loss_eval, energies_eval])
 
     # Finally, launch the training loop.
-    logger.info(
-        "Start training: regularization: %s(%f), dropout: %.2f, delta: %.2f (#training data: %d, batch size: %d, clip: %.1f)..." \
-        % (regular, (0.0 if regular == 'none' else gamma), dropout, delta, num_data, batch_size, grad_clipping))
+    logger.info("Start training: regularization: %s(%f) (#training data: %d, batch size: %d, clip: %.1f)..." % (
+        regular, (0.0 if regular == 'none' else gamma), num_data, batch_size, grad_clipping))
 
     num_batches = num_data / batch_size + 1
     dev_ucorrect = 0.0
@@ -392,8 +392,8 @@ def main():
                 pars_pred, types_pred = parser.decode_MST(energies, masks)
                 ucorr, lcorr, total, ucorr_nopunc, \
                 lcorr_nopunc, total_nopunc = parser.eval(wids, pids, pars_pred, types_pred, hids, tids, masks,
-                                                        tmp_dir + '/test_parse%d' % epoch, word_alphabet, pos_alphabet,
-                                                        type_alphabet, punct_set=punct_set)
+                                                         tmp_dir + '/test_parse%d' % epoch, word_alphabet, pos_alphabet,
+                                                         type_alphabet, punct_set=punct_set)
                 test_inst += wids.shape[0]
 
                 test_ucorr += ucorr
