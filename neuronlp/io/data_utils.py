@@ -180,7 +180,12 @@ def get_batch(data, batch_size):
 def iterate_batch(data, batch_size, shuffle=False):
     bucket_sizes = [len(data[b]) for b in xrange(len(_buckets))]
     total_size = float(sum(bucket_sizes))
-    for bucket_id, bucket_size in enumerate(bucket_sizes):
+    bucket_indices = np.arange(len(_buckets))
+    if shuffle:
+        np.random.shuffle((bucket_indices))
+
+    for bucket_id, in bucket_indices:
+        bucket_size = bucket_sizes[bucket_id]
         if bucket_size == 0:
             continue
 

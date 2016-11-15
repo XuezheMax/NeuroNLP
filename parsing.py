@@ -13,7 +13,7 @@ import theano
 import theano.tensor as T
 from lasagne.layers import Gate
 from lasagne import nonlinearities
-from lasagne.updates import nesterov_momentum, adam
+from lasagne.updates import nesterov_momentum, adam, total_norm_constraint
 
 from neuronlp.io import data_utils
 from neuronlp import utils
@@ -26,11 +26,12 @@ from neuronlp.objectives import tree_crf_loss
 from neuronlp.tasks import parser
 
 WORD_DIM = 100
-CHARACTER_DIM = 30
+POS_DIM = 50
+CHARACTER_DIM = 50
 
 
-def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, num_units, num_types,
-                  grad_clipping=5.0, num_filters=30, p=0.5):
+def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
+                  num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, use_char=False, use_pos=False):
     def generate_random_embedding(scale, shape):
         return np.random.uniform(-scale, scale, shape).astype(theano.config.floatX)
 
@@ -49,6 +50,11 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
         table = generate_random_embedding(scale, [char_alphabet.size(), CHARACTER_DIM])
         return table
 
+    def construct_pos_embedding_table():
+        scale = np.sqrt(3.0 / POS_DIM)
+        table = generate_random_embedding(scale, [pos_alphabet.size(), POS_DIM])
+        return table
+
     def construct_word_input_layer():
         # shape = [batch, n-step]
         layer_word_input = lasagne.layers.InputLayer(shape=(None, None), input_var=word_var, name='word_input')
@@ -56,6 +62,15 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
         layer_word_embedding = lasagne.layers.EmbeddingLayer(layer_word_input, input_size=word_alphabet.size(),
                                                              output_size=WORD_DIM, W=word_table, name='word_embedd')
         return layer_word_embedding
+
+    def construct_pos_input_layer():
+        # shape = [batch, n-step]
+        layer_pos_input = lasagne.layers.InputLayer(shape=(None, None), input_var=pos_var, name='pos_input')
+        # shape = [batch, n-step, w_dim]
+        layer_pos_embedding = lasagne.layers.EmbeddingLayer(layer_pos_input, input_size=pos_alphabet.size(),
+                                                             output_size=POS_DIM, W=pos_table, name='pos_embedd')
+        return layer_pos_embedding
+
 
     def construct_char_input_layer():
         # shape = [batch, n-step, char_length]
@@ -74,30 +89,37 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, nu
     assert embedd_dim == WORD_DIM
 
     word_table = construct_word_embedding_table()
-    char_table = construct_char_embedding_table()
+    pos_table = construct_pos_embedding_table() if use_pos else None
+    char_table = construct_char_embedding_table() if use_char else None
 
-    layer_char_input = construct_char_input_layer()
     layer_word_input = construct_word_input_layer()
+    incoming = layer_word_input
     mask = lasagne.layers.InputLayer(shape=(None, None), input_var=mask_var, name='mask')
 
-    # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
-    conv_window = 3
-    # shape = [batch, n-step, c_dim, char_length]
-    # construct convolution layer
-    # shape = [batch, n-step, c_filters, output_length]
-    cnn_layer = ConvTimeStep1DLayer(layer_char_input, num_filters=num_filters, filter_size=conv_window, pad='full',
-                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
-    # infer the pool size for pooling (pool size should go through all time step of cnn)
-    _, _, _, pool_size = cnn_layer.output_shape
-    # construct max pool layer
-    # shape = [batch, n-step, c_filters, 1]
-    pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
-    # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
-    output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+    if use_pos:
+        layer_pos_input = construct_pos_input_layer()
+        incoming = lasagne.layers.concat([incoming, layer_pos_input], axis=2)
 
-    # finally, concatenate the two incoming layers together.
-    # shape = [batch, n-step, c_filter&w_dim]
-    incoming = lasagne.layers.concat([output_cnn_layer, layer_word_input], axis=2)
+    if use_char:
+        layer_char_input = construct_char_input_layer()
+        # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
+        conv_window = 3
+        # shape = [batch, n-step, c_dim, char_length]
+        # construct convolution layer
+        # shape = [batch, n-step, c_filters, output_length]
+        cnn_layer = ConvTimeStep1DLayer(layer_char_input, num_filters=num_filters, filter_size=conv_window, pad='full',
+                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+        # infer the pool size for pooling (pool size should go through all time step of cnn)
+        _, _, _, pool_size = cnn_layer.output_shape
+        # construct max pool layer
+        # shape = [batch, n-step, c_filters, 1]
+        pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
+        # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
+        output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+
+        # finally, concatenate the two incoming layers together.
+        # shape = [batch, n-step, c_filter&w_dim]
+        incoming = lasagne.layers.concat([output_cnn_layer, incoming], axis=2)
 
     # dropout for incoming
     incoming = lasagne.layers.DropoutLayer(incoming, p=0.15, shared_axes=(1,))
@@ -193,6 +215,8 @@ def main():
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     args_parser.add_argument('--dropout', type=float, default=0.5, help='dropout rate')
     args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay')
+    args_parser.add_argument('--pos', action='store_true', help='using pos embedding')
+    args_parser.add_argument('--char', action='store_true', help='using cnn for character embedding')
     args_parser.add_argument('--output_prediction', action='store_true', help='Output predictions to temp files')
     args_parser.add_argument('--punctuation', default=None, help='List of punctuations separated by whitespace')
     args_parser.add_argument('--train', help='path of training data')
@@ -221,6 +245,8 @@ def main():
     beta2 = 0.999
     decay_rate = args.decay_rate
     schedule = args.schedule
+    use_pos = args.pos
+    use_char = args.char
     output_predict = args.output_prediction
     dropout = args.dropout
     punctuation = args.punctuation
@@ -241,7 +267,7 @@ def main():
     logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
     logger.info("Type Alphabet Size: %d" % type_alphabet.size())
 
-    num_pos = pos_alphabet.size() - 1
+    num_pos = pos_alphabet.size()
     num_types = type_alphabet.size()
 
     logger.info("Reading Data")
@@ -257,10 +283,12 @@ def main():
     type_var = T.imatrix(name='types')
     mask_var = T.matrix(name='masks', dtype=theano.config.floatX)
     word_var = T.imatrix(name='inputs')
+    pos_var = T.imatrix(name='pos-inputs')
     char_var = T.itensor3(name='char-inputs')
 
-    network = build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, num_units, num_types,
-                            grad_clipping, num_filters, p=dropout)
+    network = build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
+                            num_units, num_types, grad_clipping, num_filters, p=dropout,
+                            use_char=use_char, use_pos=use_pos)
 
     logger.info("Network structure: hidden=%d, filter=%d, dropout=%s, max-norm=%s, delta=%.2f" % (
         num_units, num_filters, dropout, max_norm, delta))
@@ -283,17 +311,19 @@ def main():
     params = lasagne.layers.get_all_params(network, trainable=True)
     updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
     if max_norm:
-        params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'], trainable=True)
-        assert len(params_constraint) == 3
-        for param in params_constraint:
+        params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
+        assert len(params_constraint) == 4
+        updates_new = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm)
+        for param, update in zip(params_constraint, updates_new):
             assert param in updates
-            norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
-            updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm, norm_axes=norm_axes)
+            updates[param] = update
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], loss_train, updates=updates)
+    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train, updates=updates,
+                               on_unused_input='warn')
     # Compile a second function evaluating the loss and accuracy of network
-    eval_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], [loss_eval, energies_eval])
+    eval_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_eval, energies_eval],
+                              on_unused_input='warn')
 
     # Finally, launch the training loop.
     logger.info("Start training: regularization: %s(%f) (#training data: %d, batch size: %d, clip: %.1f)..." % (
@@ -429,15 +459,14 @@ def main():
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=beta1, beta2=beta2)
             if max_norm:
-                params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c'],
-                                                           trainable=True)
-                assert len(params_constraint) == 3
-                for param in params_constraint:
+                params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
+                assert len(params_constraint) == 4
+                updates_new = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm)
+                for param, update in zip(params_constraint, updates_new):
                     assert param in updates
-                    norm_axes = (0, 1) if param.name == 'crf.U' else (0,)
-                    updates[param] = lasagne.updates.norm_constraint(updates[param], max_norm=max_norm,
-                                                                     norm_axes=norm_axes)
-            train_fn = theano.function([word_var, char_var, head_var, type_var, mask_var], loss_train, updates=updates)
+                    updates[param] = update
+            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
+                                       updates=updates, on_unused_input='warn')
 
 
 if __name__ == '__main__':
