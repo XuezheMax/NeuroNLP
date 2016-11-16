@@ -44,7 +44,9 @@ class LogAbsDet(Op):
     def grad(self, inputs, g_outputs):
         [gz] = g_outputs
         [x] = inputs
-        return [gz * matrix_inverse(x).T]
+        x_inv = matrix_inverse(x)
+        x_inv = T.switch(T.isnan(x_inv), 0, x_inv)
+        return [gz * x_inv.T]
 
     def __str__(self):
         return "LogAbsDet"
