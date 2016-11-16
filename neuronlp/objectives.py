@@ -172,8 +172,8 @@ def tree_crf_loss(energies, heads, types, masks):
     # zeros out all elements except diagonal.
     D = D * T.eye(length, length, 0).dimshuffle('x', 0, 1)
     # make sure L is positive-defined
-    rtol = 1e-6
-    atol = 1e-8
+    rtol = 1e-8
+    atol = 1e-12
     D += D * rtol + atol
 
     # compute lengths
