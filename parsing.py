@@ -325,13 +325,13 @@ def main():
     if max_norm:
         params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
         assert len(params_constraint) == 4
-        updates_new, norm = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm, return_norm=True)
+        updates_new = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm)
         for param, update in zip(params_constraint, updates_new):
             assert param in updates
             updates[param] = update
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_train, norm], updates=updates,
+    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train, updates=updates,
                                on_unused_input='warn')
     # Compile a second function evaluating the loss and accuracy of network
     eval_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_eval, energies_eval],
@@ -357,14 +357,14 @@ def main():
     lr = learning_rate
     num_updates = 0
     for epoch in range(1, num_epochs + 1):
-        print 'Epoch %d (learning rate=%.4f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
+        print 'Epoch %d (learning rate=%.5f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
         train_err = 0.0
         train_inst = 0
         start_time = time.time()
         num_back = 0
         for batch in xrange(1, num_batches + 1):
             wids, cids, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
-            err, norm = train_fn(wids, cids, pids, hids, tids, masks)
+            err = train_fn(wids, cids, pids, hids, tids, masks)
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
@@ -372,8 +372,8 @@ def main():
 
             # update log
             sys.stdout.write("\b" * num_back)
-            log_info = 'train: %d/%d loss: %.4f, norm: %.2f, time left (estimated): %.2fs' % (
-                batch, num_batches, train_err / train_inst, norm, time_left)
+            log_info = 'train: %d/%d loss: %.4f, time left: %.2fs' % (
+                batch, num_batches, train_err / train_inst, time_left)
             sys.stdout.write(log_info)
             num_back = len(log_info)
         # update training log after each epoch
@@ -482,11 +482,11 @@ def main():
             if max_norm:
                 params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
                 assert len(params_constraint) == 4
-                updates_new, norm = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm, return_norm=True)
+                updates_new = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm)
                 for param, update in zip(params_constraint, updates_new):
                     assert param in updates
                     updates[param] = update
-            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_train, norm],
+            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
                                        updates=updates, on_unused_input='warn')
 
 
