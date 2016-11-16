@@ -172,14 +172,15 @@ def tree_crf_loss(energies, heads, types, masks):
     # zeros out all elements except diagonal.
     D = D * T.eye(length, length, 0).dimshuffle('x', 0, 1)
     # make sure L is positive-defined
-    rtol = 1e-8
-    atol = 1e-12
+    rtol = 1e-6
+    atol = 1e-8
     D += D * rtol + atol
 
     # compute lengths
     lengths = T.cast(masks, dtype='int32').sum(axis=1)
     # compute laplacian matrix
-    L = D - E
+    MAX = 1e30
+    L = T.clip(D - E, -MAX, MAX)
 
     # compute partition Z(x)
     partitions, _ = theano.scan(fn=lambda laps, len: logabsdet(laps[1:len, 1:len]), outputs_info=None,
