@@ -355,6 +355,8 @@ def main():
     test_total_nopunc = 0
     test_inst = 0
     lr = learning_rate
+    num_updates = 0
+    schedule = 2000
     for epoch in range(1, num_epochs + 1):
         print 'Epoch %d (learning rate=%.4f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
         train_err = 0.0
@@ -380,6 +382,7 @@ def main():
         sys.stdout.write("\b" * num_back)
         print 'train: %d/%d loss: %.4f, time: %.2fs' % (
             train_inst, train_inst, train_err / train_inst, time.time() - start_time)
+        num_updates += num_batches
 
         # evaluate performance on dev data
         dev_err = 0.0
@@ -467,7 +470,9 @@ def main():
             test_ucorrect_nopunct * 100 / test_total_nopunc, test_lcorrect_nopunct * 100 / test_total_nopunc,
             best_epoch)
 
-        if epoch in schedule:
+        # if epoch in schedule:
+        if num_updates >= schedule:
+            num_updates = 0
             lr = lr * decay_rate
             if opt == 'adam':
                 updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
