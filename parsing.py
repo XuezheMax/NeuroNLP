@@ -216,7 +216,7 @@ def main():
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     args_parser.add_argument('--opt', choices=['adam', 'momentum'], help='optimization algorithm', required=True)
     args_parser.add_argument('--dropout', type=float, default=0.5, help='dropout rate')
-    args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay')
+    args_parser.add_argument('--schedule', type=int, help='schedule for learning rate decay', required=True)
     args_parser.add_argument('--pos', action='store_true', help='using pos embedding')
     args_parser.add_argument('--char', action='store_true', help='using cnn for character embedding')
     args_parser.add_argument('--normalize_digits', action='store_true', help='normalize digits')
@@ -338,8 +338,8 @@ def main():
                               on_unused_input='warn')
 
     # Finally, launch the training loop.
-    logger.info("Start training: regularization: %s(%f) (#training data: %d, batch size: %d, clip: %.1f)..." % (
-        regular, (0.0 if regular == 'none' else gamma), num_data, batch_size, grad_clipping))
+    logger.info("Start training: schedule: %d (#training data: %d, batch size: %d, clip: %.1f)..." % (
+        schedule, num_data, batch_size, grad_clipping))
 
     num_batches = num_data / batch_size + 1
     dev_ucorrect = 0.0
@@ -356,7 +356,6 @@ def main():
     test_inst = 0
     lr = learning_rate
     num_updates = 0
-    schedule = 2000
     for epoch in range(1, num_epochs + 1):
         print 'Epoch %d (learning rate=%.4f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
         train_err = 0.0
