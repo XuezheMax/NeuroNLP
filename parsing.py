@@ -427,7 +427,7 @@ def main():
             dev_ucorr_nopunc, dev_lcorr_nopunc, dev_total_nopunc, dev_ucorr_nopunc * 100 / dev_total_nopunc,
             dev_lcorr_nopunc * 100 / dev_total_nopunc)
 
-        if dev_ucorrect_nopunct < dev_ucorr_nopunc:
+        if dev_ucorrect_nopunct <= dev_ucorr_nopunc:
             dev_ucorrect_nopunct = dev_ucorr_nopunc
             dev_lcorrect_nopunct = dev_lcorr_nopunc
             dev_ucorrect = dev_ucorr
