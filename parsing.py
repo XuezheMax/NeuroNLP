@@ -201,21 +201,21 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
     return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask, name='crf')
 
 
-def create_updates(loss, network, opt, learning_rate, momentum, beta1, beta2, max_norm):
+def create_updates(loss, network, opt, learning_rate, momentum, beta1, beta2):
     params = lasagne.layers.get_all_params(network, trainable=True)
     grads = theano.grad(loss, params)
-    if max_norm:
-        names = ['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b']
-        constraints = [grad for param, grad in zip(params, grads) if param.name in names]
-        assert len(constraints) == 4
-        scaled_grads = total_norm_constraint(constraints, max_norm=max_norm)
-        counter = 0
-        for i in xrange(len(params)):
-            param = params[i]
-            if param.name in names:
-                grads[i] = scaled_grads[counter]
-                counter += 1
-        assert counter == 4
+    # if max_norm:
+    #     names = ['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b']
+    #     constraints = [grad for param, grad in zip(params, grads) if param.name in names]
+    #     assert len(constraints) == 4
+    #     scaled_grads = total_norm_constraint(constraints, max_norm=max_norm)
+    #     counter = 0
+    #     for i in xrange(len(params)):
+    #         param = params[i]
+    #         if param.name in names:
+    #             grads[i] = scaled_grads[counter]
+    #             counter += 1
+    #     assert counter == 4
     if opt == 'adam':
         updates = adam(grads, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
     elif opt == 'momentum':
@@ -321,8 +321,7 @@ def main():
                             num_units, num_types, grad_clipping, num_filters, p=dropout,
                             use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits)
 
-    logger.info("Network structure: hidden=%d, filter=%d, dropout=%s, max-norm=%s, delta=%.2f" % (
-        num_units, num_filters, dropout, max_norm, delta))
+    logger.info("Network structure: hidden=%d, filter=%d, dropout=%s" % (num_units, num_filters, dropout))
     # compute loss
     energies_train = lasagne.layers.get_output(network)
     energies_eval = lasagne.layers.get_output(network, deterministic=True)
@@ -339,7 +338,7 @@ def main():
         l2_penalty = lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)
         loss_train = loss_train + gamma * l2_penalty
 
-    updates = create_updates(loss_train, network, opt, learning_rate, momentum, beta1, beta2, max_norm)
+    updates = create_updates(loss_train, network, opt, learning_rate, momentum, beta1, beta2)
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train, updates=updates,
@@ -484,7 +483,7 @@ def main():
         if num_updates >= schedule:
             num_updates = 0
             lr = lr * decay_rate
-            updates = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2, max_norm)
+            updates = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2)
             train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
                                        updates=updates, on_unused_input='warn')
 
