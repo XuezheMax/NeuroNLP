@@ -32,7 +32,7 @@ CHARACTER_DIM = 50
 
 def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
                   num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, use_char=False, use_pos=False,
-                  normalize_digits=True):
+                  normalize_digits=True, embedding='glove', embedding_path='data/glove/glove.6B/glove.6B.100d.gz'):
     def generate_random_embedding(scale, shape):
         return np.random.uniform(-scale, scale, shape).astype(theano.config.floatX)
 
@@ -85,9 +85,9 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
         layer_char_embedding = lasagne.layers.DimshuffleLayer(layer_char_embedding, pattern=(0, 1, 3, 2))
         return layer_char_embedding
 
-    embedd_dict, embedd_dim, caseless = utils.load_word_embedding_dict('glove', "data/glove/glove.6B/glove.6B.100d.gz",
+    embedd_dict, embedd_dim, caseless = utils.load_word_embedding_dict(embedding, embedding_path,
                                                                        normalize_digits=normalize_digits)
-    assert embedd_dim == WORD_DIM
+    WORD_DIM = embedd_dim
 
     word_table = construct_word_embedding_table()
     pos_table = construct_pos_embedding_table() if use_pos else None
@@ -249,6 +249,10 @@ def main():
     args_parser.add_argument('--train', help='path of training data')
     args_parser.add_argument('--dev', help='path of validation data')
     args_parser.add_argument('--test', help='path of test data')
+    args_parser.add_argument('--embedding', choices=['glove', 'senna', 'sskip'], help='Embedding for words',
+                        required=True)
+    args_parser.add_argument('--embedding_dict', default='data/word2vec/GoogleNews-vectors-negative300.bin',
+                        help='path for embedding dict')
     args_parser.add_argument('--tmp', default='tmp', help='Directory for temp files.')
 
     args = args_parser.parse_args()
@@ -280,6 +284,8 @@ def main():
     dropout = args.dropout
     punctuation = args.punctuation
     tmp_dir = args.tmp
+    embedding = args.embedding
+    embedding_path = args.embedding_dict
 
     punct_set = None
     if punctuation is not None:
@@ -319,7 +325,8 @@ def main():
 
     network = build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
                             num_units, num_types, grad_clipping, num_filters, p=dropout,
-                            use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits)
+                            use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits,
+                            embedding=embedding, embedding_path=embedding_path)
 
     logger.info("Network structure: hidden=%d, filter=%d, dropout=%s" % (num_units, num_filters, dropout))
     # compute loss

@@ -53,7 +53,7 @@ def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, min_oc
             logger.info("Processing data: %s" % data_path)
             with open(data_path, 'r') as file:
                 for line in file:
-                    line.decode('utf-8')
+                    line = line.decode('utf-8')
                     line = line.strip()
                     if len(line) == 0:
                         continue

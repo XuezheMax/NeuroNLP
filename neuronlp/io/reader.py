@@ -21,7 +21,7 @@ class CoNLLReader(object):
         line = self.__source_file.readline()
         while line is not None and len(line.strip()) > 0:
             line = line.strip()
-            line.decode('utf-8')
+            line = line.decode('utf-8')
             lines.append(line.split())
             line = self.__source_file.readline()
 
