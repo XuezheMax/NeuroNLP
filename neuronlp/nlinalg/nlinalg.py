@@ -87,7 +87,7 @@ class LogSafeAbsDet(Op):
         [gz] = g_outputs
         [x] = inputs
         UPPER_BOUND = 1e+38
-        MAX_ELEM = 1e+10
+        MAX_ELEM = 1e+30
         epsilon = 1e-7
         dtype = numpy.dtype(theano.config.floatX).type
 
