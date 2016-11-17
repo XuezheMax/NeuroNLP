@@ -86,15 +86,15 @@ class LogSafeAbsDet(Op):
     def grad(self, inputs, g_outputs):
         [gz] = g_outputs
         [x] = inputs
-        MAX = 1e+38
+        UPPER_BOUND = 1e+38
         MAX_ELEM = 1e+10
         epsilon = 1e-7
         dtype = numpy.dtype(theano.config.floatX).type
 
         x_inv = matrix_inverse(x)
         x_inv = T.switch(T.isnan(x_inv), 0, x_inv)
-        x_inv = T.clip(x_inv, -MAX, +MAX)
-        max_element = T.max(T.abs_(x_inv))
+        x_inv = T.clip(x_inv, dtype(-UPPER_BOUND), dtype(UPPER_BOUND))
+        max_element = (T.abs_(x_inv)).max()
         target = T.clip(max_element, 0, dtype(MAX_ELEM))
         multiplier = target / (dtype(epsilon) + max_element)
         x_inv = x_inv * multiplier

@@ -3,7 +3,7 @@ __author__ = 'max'
 import numpy as np
 import theano
 import theano.tensor as T
-from .nlinalg import theano_logsumexp, logabsdet_safe
+from .nlinalg import theano_logsumexp, logabsdet_safe, logabsdet
 
 __all__ = [
     "chain_crf_loss",
@@ -171,9 +171,11 @@ def tree_crf_loss(energies, heads, types, masks):
     D = T.zeros_like(E) + D.dimshuffle(0, 1, 'x')
     # zeros out all elements except diagonal.
     D = D * T.eye(length, length, 0).dimshuffle('x', 0, 1)
+
+    dtype = np.dtype(theano.config.floatX).type
     # make sure L is positive-defined
-    rtol = 1e-6
-    atol = 1e-8
+    rtol = dtype(1e-6) if theano.config.floatX == 'float32' else dtype(1e-8)
+    atol = dtype(1e-8) if theano.config.floatX == 'float32' else dtype(1e-10)
     D += D * rtol + atol
 
     # compute lengths
@@ -181,8 +183,10 @@ def tree_crf_loss(energies, heads, types, masks):
     # compute laplacian matrix
     L = D - E
 
+    logdet = logabsdet_safe if theano.config.floatX == 'float32' else logabsdet
+
     # compute partition Z(x)
-    partitions, _ = theano.scan(fn=lambda laps, len: logabsdet_safe(laps[1:len, 1:len]), outputs_info=None,
+    partitions, _ = theano.scan(fn=lambda laps, len: logdet(laps[1:len, 1:len]), outputs_info=None,
                                 sequences=[L, lengths])
 
     # compute targets energy
