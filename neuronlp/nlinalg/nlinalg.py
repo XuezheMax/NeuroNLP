@@ -44,8 +44,10 @@ class LogAbsDet(Op):
     def grad(self, inputs, g_outputs):
         [gz] = g_outputs
         [x] = inputs
+        MAX = 1e+20
         x_inv = matrix_inverse(x)
         x_inv = T.switch(T.isnan(x_inv), 0, x_inv)
+        x_inv = T.clip(x_inv, -MAX, +MAX)
         return [gz * x_inv.T]
 
     def __str__(self):
