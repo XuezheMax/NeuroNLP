@@ -201,6 +201,30 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
     return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask, name='crf')
 
 
+def create_updates(loss, network, opt, learning_rate, momentum, beta1, beta2, max_norm):
+    params = lasagne.layers.get_all_params(network, trainable=True)
+    grads = theano.grad(loss, params)
+    if max_norm:
+        names = ['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b']
+        constraints = [grad for param, grad in zip(params, grads) if param.name in names]
+        assert len(constraints) == 4
+        scaled_grads, norm = total_norm_constraint(constraints, max_norm=max_norm, return_norm=True)
+        counter = 0
+        for i in xrange(len(params)):
+            param = params[i]
+            if param.name in names:
+                grads[i] = scaled_grads[counter]
+                counter += 1
+        assert counter == 4
+    if opt == 'adam':
+        updates = adam(grads, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
+    elif opt == 'momentum':
+        updates = nesterov_momentum(grads, params=params, learning_rate=learning_rate, momentum=momentum)
+    else:
+        raise ValueError('unkown optimization algorithm: %s' % opt)
+
+    return updates, norm
+
 def main():
     args_parser = argparse.ArgumentParser(description='Neural MST-Parser')
     args_parser.add_argument('--num_epochs', type=int, default=1000, help='Number of training epochs')
@@ -315,23 +339,10 @@ def main():
         l2_penalty = lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)
         loss_train = loss_train + gamma * l2_penalty
 
-    params = lasagne.layers.get_all_params(network, trainable=True)
-    if opt == 'adam':
-        updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
-    elif opt == 'momentum':
-        updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
-    else:
-        raise ValueError('unkown optimization algorithm: %s' % opt)
-    if max_norm:
-        params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
-        assert len(params_constraint) == 4
-        updates_new = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm)
-        for param, update in zip(params_constraint, updates_new):
-            assert param in updates
-            updates[param] = update
+    updates, norm = create_updates(loss_train, network, opt, learning_rate, momentum, beta1, beta2, max_norm)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train, updates=updates,
+    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_train, norm], updates=updates,
                                on_unused_input='warn')
     # Compile a second function evaluating the loss and accuracy of network
     eval_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_eval, energies_eval],
@@ -364,7 +375,7 @@ def main():
         num_back = 0
         for batch in xrange(1, num_batches + 1):
             wids, cids, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
-            err = train_fn(wids, cids, pids, hids, tids, masks)
+            err, norm = train_fn(wids, cids, pids, hids, tids, masks)
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
@@ -372,15 +383,15 @@ def main():
 
             # update log
             sys.stdout.write("\b" * num_back)
-            log_info = 'train: %d/%d loss: %.4f, time left: %.2fs' % (
-                batch, num_batches, train_err / train_inst, time_left)
+            log_info = 'train: %d/%d loss: %.4f, norm: %.2f time left: %.2fs' % (
+                batch, num_batches, train_err / train_inst, norm, time_left)
             sys.stdout.write(log_info)
             num_back = len(log_info)
         # update training log after each epoch
         assert train_inst == num_batches * batch_size
         sys.stdout.write("\b" * num_back)
-        print 'train: %d/%d loss: %.4f, time: %.2fs' % (
-            train_inst, train_inst, train_err / train_inst, time.time() - start_time)
+        print 'train: %d/%d loss: %.4f, norm: %.2f, time: %.2fs' % (
+            train_inst, train_inst, train_err / train_inst, norm, time.time() - start_time)
         num_updates += num_batches
 
         # evaluate performance on dev data
@@ -473,19 +484,7 @@ def main():
         if num_updates >= schedule:
             num_updates = 0
             lr = lr * decay_rate
-            if opt == 'adam':
-                updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=beta1, beta2=beta2)
-            elif opt == 'momentum':
-                updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
-            else:
-                raise ValueError('unkown optimization algorithm: %s' % opt)
-            if max_norm:
-                params_constraint = get_all_params_by_name(network, name=['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b'])
-                assert len(params_constraint) == 4
-                updates_new = total_norm_constraint([updates[param] for param in params_constraint], max_norm=max_norm)
-                for param, update in zip(params_constraint, updates_new):
-                    assert param in updates
-                    updates[param] = update
+            updates, norm = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2, max_norm)
             train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
                                        updates=updates, on_unused_input='warn')
 
