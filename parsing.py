@@ -485,7 +485,7 @@ def main():
             num_updates = 0
             lr = lr * decay_rate
             updates, norm = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2, max_norm)
-            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
+            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_train, norm],
                                        updates=updates, on_unused_input='warn')
 
 
