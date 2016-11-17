@@ -3,7 +3,7 @@ __author__ = 'max'
 import numpy as np
 import theano
 import theano.tensor as T
-from .nlinalg import theano_logsumexp, logabsdet
+from .nlinalg import theano_logsumexp, logabsdet_safe
 
 __all__ = [
     "chain_crf_loss",
@@ -182,7 +182,7 @@ def tree_crf_loss(energies, heads, types, masks):
     L = D - E
 
     # compute partition Z(x)
-    partitions, _ = theano.scan(fn=lambda laps, len: logabsdet(laps[1:len, 1:len]), outputs_info=None,
+    partitions, _ = theano.scan(fn=lambda laps, len: logabsdet_safe(laps[1:len, 1:len]), outputs_info=None,
                                 sequences=[L, lengths])
 
     # compute targets energy
