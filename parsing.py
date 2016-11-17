@@ -208,7 +208,7 @@ def create_updates(loss, network, opt, learning_rate, momentum, beta1, beta2, ma
         names = ['crf.U', 'crf.W_h', 'crf.W_c', 'crf.b']
         constraints = [grad for param, grad in zip(params, grads) if param.name in names]
         assert len(constraints) == 4
-        scaled_grads, norm = total_norm_constraint(constraints, max_norm=max_norm, return_norm=True)
+        scaled_grads = total_norm_constraint(constraints, max_norm=max_norm)
         counter = 0
         for i in xrange(len(params)):
             param = params[i]
@@ -223,7 +223,7 @@ def create_updates(loss, network, opt, learning_rate, momentum, beta1, beta2, ma
     else:
         raise ValueError('unkown optimization algorithm: %s' % opt)
 
-    return updates, norm
+    return updates
 
 def main():
     args_parser = argparse.ArgumentParser(description='Neural MST-Parser')
@@ -339,10 +339,10 @@ def main():
         l2_penalty = lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)
         loss_train = loss_train + gamma * l2_penalty
 
-    updates, norm = create_updates(loss_train, network, opt, learning_rate, momentum, beta1, beta2, max_norm)
+    updates = create_updates(loss_train, network, opt, learning_rate, momentum, beta1, beta2, max_norm)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_train, norm], updates=updates,
+    train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train, updates=updates,
                                on_unused_input='warn')
     # Compile a second function evaluating the loss and accuracy of network
     eval_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_eval, energies_eval],
@@ -375,7 +375,7 @@ def main():
         num_back = 0
         for batch in xrange(1, num_batches + 1):
             wids, cids, pids, hids, tids, masks = data_utils.get_batch(data_train, batch_size)
-            err, norm = train_fn(wids, cids, pids, hids, tids, masks)
+            err = train_fn(wids, cids, pids, hids, tids, masks)
             train_err += err * wids.shape[0]
             train_inst += wids.shape[0]
             time_ave = (time.time() - start_time) / batch
@@ -383,15 +383,15 @@ def main():
 
             # update log
             sys.stdout.write("\b" * num_back)
-            log_info = 'train: %d/%d loss: %.4f, norm: %.2f time left: %.2fs' % (
-                batch, num_batches, train_err / train_inst, norm, time_left)
+            log_info = 'train: %d/%d loss: %.4f, time left: %.2fs' % (
+                batch, num_batches, train_err / train_inst, time_left)
             sys.stdout.write(log_info)
             num_back = len(log_info)
         # update training log after each epoch
         assert train_inst == num_batches * batch_size
         sys.stdout.write("\b" * num_back)
-        print 'train: %d/%d loss: %.4f, norm: %.2f, time: %.2fs' % (
-            train_inst, train_inst, train_err / train_inst, norm, time.time() - start_time)
+        print 'train: %d/%d loss: %.4f, time: %.2fs' % (
+            train_inst, train_inst, train_err / train_inst, time.time() - start_time)
         num_updates += num_batches
 
         # evaluate performance on dev data
@@ -484,8 +484,8 @@ def main():
         if num_updates >= schedule:
             num_updates = 0
             lr = lr * decay_rate
-            updates, norm = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2, max_norm)
-            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], [loss_train, norm],
+            updates = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2, max_norm)
+            train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
                                        updates=updates, on_unused_input='warn')
 
 
