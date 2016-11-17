@@ -183,7 +183,7 @@ def tree_crf_loss(energies, heads, types, masks):
     # compute laplacian matrix
     L = D - E
 
-    logdet = logabsdet_safe if theano.config.floatX == 'float32' else logabsdet
+    logdet = logabsdet if theano.config.floatX == 'float32' else logabsdet
 
     # compute partition Z(x)
     partitions, _ = theano.scan(fn=lambda laps, len: logdet(laps[1:len, 1:len]), outputs_info=None,
