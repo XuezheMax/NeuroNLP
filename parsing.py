@@ -240,7 +240,7 @@ def main():
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     args_parser.add_argument('--opt', choices=['adam', 'momentum'], help='optimization algorithm', required=True)
     args_parser.add_argument('--dropout', type=float, default=0.5, help='dropout rate')
-    args_parser.add_argument('--schedule', type=int, help='schedule for learning rate decay', required=True)
+    args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay', required=True)
     args_parser.add_argument('--pos', action='store_true', help='using pos embedding')
     args_parser.add_argument('--char', action='store_true', help='using cnn for character embedding')
     args_parser.add_argument('--normalize_digits', action='store_true', help='normalize digits')
@@ -356,8 +356,8 @@ def main():
                               on_unused_input='warn')
 
     # Finally, launch the training loop.
-    logger.info("Start training: schedule: %d (#training data: %d, batch size: %d, clip: %.1f)..." % (
-        schedule, num_data, batch_size, grad_clipping))
+    logger.info("Start training: (#training data: %d, batch size: %d, clip: %.1f)..." % (
+            num_data, batch_size, grad_clipping))
 
     num_batches = num_data / batch_size + 1
     dev_ucorrect = 0.0
@@ -373,7 +373,6 @@ def main():
     test_total_nopunc = 0
     test_inst = 0
     lr = learning_rate
-    num_updates = 0
     for epoch in range(1, num_epochs + 1):
         print 'Epoch %d (learning rate=%.5f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
         train_err = 0.0
@@ -399,7 +398,6 @@ def main():
         sys.stdout.write("\b" * num_back)
         print 'train: %d/%d loss: %.4f, time: %.2fs' % (
             train_inst, train_inst, train_err / train_inst, time.time() - start_time)
-        num_updates += num_batches
 
         # evaluate performance on dev data
         dev_err = 0.0
@@ -488,8 +486,7 @@ def main():
             best_epoch)
 
         # if epoch in schedule:
-        if num_updates >= schedule:
-            num_updates = 0
+        if epoch in schedule:
             lr = lr * decay_rate
             updates = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2)
             train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,

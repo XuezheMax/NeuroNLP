@@ -80,11 +80,11 @@ def load_word_embedding_dict(embedding, embedding_path, normalize_digits=True):
                 tokens = line.split()
                 if embedd_dim < 0:
                     embedd_dim = len(tokens) - 1
-                else:
-                    assert (embedd_dim + 1 == len(tokens))
                 embedd = np.empty([1, embedd_dim], dtype=theano.config.floatX)
-                embedd[:] = tokens[1:]
-                word = data_utils.DIGIT_RE.sub(b"0", tokens[0]) if normalize_digits else tokens[0]
+                start = len(tokens) - embedd_dim
+                word = ' '.join(tokens[0:start])
+                embedd[:] = tokens[start:]
+                word = data_utils.DIGIT_RE.sub(b"0", word) if normalize_digits else word
                 embedd_dict[word] = embedd
         return embedd_dict, embedd_dim, True
 

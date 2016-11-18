@@ -174,7 +174,7 @@ def tree_crf_loss(energies, heads, types, masks):
 
     dtype = np.dtype(theano.config.floatX).type
     # make sure L is positive-defined
-    rtol = dtype(1e-5) if theano.config.floatX == 'float32' else dtype(1e-8)
+    rtol = dtype(1e-6) if theano.config.floatX == 'float32' else dtype(1e-8)
     atol = dtype(1e-8) if theano.config.floatX == 'float32' else dtype(1e-12)
     D += D * rtol + atol
 
