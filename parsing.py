@@ -245,7 +245,8 @@ def main():
     args_parser.add_argument('--char', action='store_true', help='using cnn for character embedding')
     args_parser.add_argument('--normalize_digits', action='store_true', help='normalize digits')
     args_parser.add_argument('--output_prediction', action='store_true', help='Output predictions to temp files')
-    args_parser.add_argument('--punctuation', default=None, help='List of punctuations separated by whitespace')
+    # args_parser.add_argument('--punctuation', default=None, help='List of punctuations separated by whitespace')
+    args_parser.add_argument('--punctuation', nargs='+', type=str, help='List of punctuations')
     args_parser.add_argument('--train', help='path of training data')
     args_parser.add_argument('--dev', help='path of validation data')
     args_parser.add_argument('--test', help='path of test data')
@@ -289,8 +290,8 @@ def main():
 
     punct_set = None
     if punctuation is not None:
-        punct_set = set(punctuation.split())
-        logger.info("punctuations: %s" % ' '.join(punct_set))
+        punct_set = set(punctuation)
+        logger.info("punctuations(%d): %s" % (len(punct_set), ' '.join(punct_set)))
 
     logger.info("Creating Alphabets: normalize_digits=%s" % normalize_digits)
     word_alphabet, char_alphabet, \
