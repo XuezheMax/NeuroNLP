@@ -28,7 +28,7 @@ MAX_CHAR_LENGTH = 45
 # Regular expressions used to normalize digits.
 DIGIT_RE = re.compile(br"\d")
 
-_buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 120]
+_buckets = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 140]
 
 
 def create_alphabets(alphabet_directory, data_paths, max_vocabulary_size, min_occurence=1, normalize_digits=True):
