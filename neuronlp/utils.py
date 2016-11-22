@@ -2,6 +2,7 @@ __author__ = 'max'
 
 import logging
 import sys
+import pickle
 import numpy as np
 from gensim.models.word2vec import Word2Vec
 import gzip
@@ -87,6 +88,16 @@ def load_word_embedding_dict(embedding, embedding_path, normalize_digits=True):
                 word = data_utils.DIGIT_RE.sub(b"0", word) if normalize_digits else word
                 embedd_dict[word] = embedd
         return embedd_dict, embedd_dim, True
+    elif embedding == 'polyglot':
+        words, embeddings = pickle.load(open(embedding_path, 'rb'))
+        _, embedd_dim = embeddings.shape
+        embedd_dict = dict()
+        for i, word in enumerate(words):
+            embedd = np.empty([1, embedd_dim], dtype=theano.config.floatX)
+            embedd[:] = embeddings[i, :]
+            word = data_utils.DIGIT_RE.sub(b"0", word) if normalize_digits else word
+            embedd_dict[word] = embedd
+        return embedd_dict, embedd_dim, False
 
     else:
         raise ValueError("embedding should choose from [word2vec, senna]")
