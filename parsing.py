@@ -25,14 +25,11 @@ from neuronlp.layers.crf import TreeBiAffineCRFLayer
 from neuronlp.objectives import tree_crf_loss
 from neuronlp.tasks import parser
 
-WORD_DIM = 100
-POS_DIM = 50
-CHARACTER_DIM = 50
-
 
 def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
                   depth, num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, use_char=False, use_pos=False,
-                  normalize_digits=True, embedding='glove', embedding_path='data/glove/glove.6B/glove.6B.100d.gz'):
+                  normalize_digits=True, embedding='glove', embedding_path='data/glove/glove.6B/glove.6B.100d.gz',
+                  char_embedding='random', char_path=None):
     def generate_random_embedding(scale, shape):
         return np.random.uniform(-scale, scale, shape).astype(theano.config.floatX)
 
@@ -42,13 +39,26 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
         table[data_utils.UNK_ID, :] = generate_random_embedding(scale, [1, WORD_DIM])
         for word, index in word_alphabet.iteritems():
             ww = word.lower() if caseless else word
-            embedding = embedd_dict[ww] if ww in embedd_dict else generate_random_embedding(scale, [1, WORD_DIM])
-            table[index, :] = embedding
+            embedd = embedd_dict[ww] if ww in embedd_dict else generate_random_embedding(scale, [1, WORD_DIM])
+            table[index, :] = embedd
+        print 'construct word table: %s, dimension: %d' % (embedding, table.shape[1])
         return table
 
     def construct_char_embedding_table():
-        scale = np.sqrt(3.0 / CHARACTER_DIM)
-        table = generate_random_embedding(scale, [char_alphabet.size(), CHARACTER_DIM])
+        if char_embedding == 'random':
+            scale = np.sqrt(3.0 / CHARACTER_DIM)
+            table = generate_random_embedding(scale, [char_alphabet.size(), CHARACTER_DIM])
+        else:
+            char_dict, char_dim, caseless = utils.load_word_embedding_dict(char_embedding, char_path,
+                                                                           normalize_digits=False)
+            scale = np.sqrt(3.0 / char_dim)
+            table = np.empty([char_alphabet.size(), char_dim], dtype=theano.config.floatX)
+            table[data_utils.UNK_ID, :] = generate_random_embedding(scale, [1, char_dim])
+            for char, index in char_alphabet.iteritems():
+                cc = char.lower() if caseless else char
+                char_embedd = char_dict[cc] if cc in char_dict else generate_random_embedding(scale, [1, char_dim])
+                table[index, :] = char_embedd
+        print 'construct character table: %s, dimension: %d' % (char_embedding, table.shape[1])
         return table
 
     def construct_pos_embedding_table():
@@ -129,11 +139,16 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
 
     embedd_dict, embedd_dim, caseless = utils.load_word_embedding_dict(embedding, embedding_path,
                                                                        normalize_digits=normalize_digits)
-    WORD_DIM = embedd_dim
 
     word_table = construct_word_embedding_table()
     pos_table = construct_pos_embedding_table() if use_pos else None
     char_table = construct_char_embedding_table() if use_char else None
+
+    WORD_DIM = embedd_dim
+    POS_DIM = 50
+    CHARACTER_DIM = 50
+    if char_table is not None:
+        CHARACTER_DIM = char_table.shape[1]
 
     layer_word_input = construct_word_input_layer()
     incoming = layer_word_input
@@ -228,8 +243,12 @@ def main():
     args_parser.add_argument('--test', help='path of test data')
     args_parser.add_argument('--embedding', choices=['glove', 'senna', 'sskip', 'polyglot'], help='Embedding for words',
                              required=True)
+    args_parser.add_argument('--char_embedding', choices=['random', 'polyglot'], help='Embedding for characters',
+                             required=True)
     args_parser.add_argument('--embedding_dict', default='data/word2vec/GoogleNews-vectors-negative300.bin',
                              help='path for embedding dict')
+    args_parser.add_argument('--char_dict', default='data/polyglot/polyglot-zh_char.pkl',
+                             help='path for character embedding dict')
     args_parser.add_argument('--tmp', default='tmp', help='Directory for temp files.')
 
     args = args_parser.parse_args()
@@ -263,7 +282,9 @@ def main():
     punctuation = args.punctuation
     tmp_dir = args.tmp
     embedding = args.embedding
+    char_embedding = args.char_embedding
     embedding_path = args.embedding_dict
+    char_path = args.char_dict
 
     punct_set = None
     if punctuation is not None:
@@ -304,7 +325,8 @@ def main():
     network = build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
                             depth, num_units, num_types, grad_clipping, num_filters, p=dropout,
                             use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits,
-                            embedding=embedding, embedding_path=embedding_path)
+                            embedding=embedding, embedding_path=embedding_path,
+                            char_embedding=char_embedding, char_path=char_path)
 
     logger.info("Network: depth=%d, hidden=%d, filter=%d, dropout=%s" % (depth, num_units, num_filters, dropout))
     # compute loss
