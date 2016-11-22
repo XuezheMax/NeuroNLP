@@ -64,6 +64,7 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
     def construct_pos_embedding_table():
         scale = np.sqrt(3.0 / POS_DIM)
         table = generate_random_embedding(scale, [pos_alphabet.size(), POS_DIM])
+        print 'construct pos table: %s, dimension: %d' % ('random', table.shape[1])
         return table
 
     def construct_word_input_layer():
