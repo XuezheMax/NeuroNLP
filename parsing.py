@@ -141,13 +141,14 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
     embedd_dict, embedd_dim, caseless = utils.load_word_embedding_dict(embedding, embedding_path,
                                                                        normalize_digits=normalize_digits)
 
+    WORD_DIM = embedd_dim
+    POS_DIM = 50
+    CHARACTER_DIM = 50
+
     word_table = construct_word_embedding_table()
     pos_table = construct_pos_embedding_table() if use_pos else None
     char_table = construct_char_embedding_table() if use_char else None
 
-    WORD_DIM = embedd_dim
-    POS_DIM = 50
-    CHARACTER_DIM = 50
     if char_table is not None:
         CHARACTER_DIM = char_table.shape[1]
 
