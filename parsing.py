@@ -27,8 +27,9 @@ from neuronlp.tasks import parser
 
 
 def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
-                  depth, num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, use_char=False, use_pos=False,
-                  normalize_digits=True, embedding='glove', embedding_path='data/glove/glove.6B/glove.6B.100d.gz',
+                  depth, num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, mlp=1,
+                  use_char=False, use_pos=False, normalize_digits=True,
+                  embedding='glove', embedding_path='data/glove/glove.6B/glove.6B.100d.gz',
                   char_embedding='random', char_path=None):
     def generate_random_embedding(scale, shape):
         return np.random.uniform(-scale, scale, shape).astype(theano.config.floatX)
@@ -185,9 +186,12 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
     incoming = lasagne.layers.DropoutLayer(incoming, p=0.15, shared_axes=(1,))
     # shape [batch, n-step, num_units]
     bi_lstm_cnn = construct_bi_lstm_layer()
-    # 1-layer MLP with 100 units
+
+    # MLP layers
     # shape [batch, n-step, 100]
-    bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu, num_leading_axes=2)
+    for d in xrange(mlp):
+        bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu,
+                                                num_leading_axes=2, name='dense%d' % d)
 
     return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask, name='crf')
 
@@ -223,6 +227,7 @@ def main():
     args_parser.add_argument('--batch_size', type=int, default=10, help='Number of sentences in each batch')
     args_parser.add_argument('--num_units', type=int, default=100, help='Number of hidden units in LSTM')
     args_parser.add_argument('--depth', type=int, default=2, help='Depth of LSTM layer')
+    args_parser.add_argument('--mlp', type=int, default=1, help='Depth of MLP layer')
     args_parser.add_argument('--num_filters', type=int, default=20, help='Number of filters in CNN')
     args_parser.add_argument('--learning_rate', type=float, default=0.1, help='Learning rate')
     args_parser.add_argument('--decay_rate', type=float, default=0.1, help='Decay rate of learning rate')
@@ -263,6 +268,7 @@ def main():
     batch_size = args.batch_size
     num_units = args.num_units
     depth = args.depth
+    mlp = args.mlp
     num_filters = args.num_filters
     regular = args.regular
     opt = args.opt
@@ -325,12 +331,13 @@ def main():
     char_var = T.itensor3(name='char-inputs')
 
     network = build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
-                            depth, num_units, num_types, grad_clipping, num_filters, p=dropout,
+                            depth, num_units, num_types, grad_clipping, num_filters, p=dropout, mlp=mlp,
                             use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits,
                             embedding=embedding, embedding_path=embedding_path,
                             char_embedding=char_embedding, char_path=char_path)
 
-    logger.info("Network: depth=%d, hidden=%d, filter=%d, dropout=%s" % (depth, num_units, num_filters, dropout))
+    logger.info(
+        "Network: depth=%d, hidden=%d, filter=%d, dropout=%s, #mlp=%d" % (depth, num_units, num_filters, dropout, mlp))
     # compute loss
     energies_train = lasagne.layers.get_output(network)
     energies_eval = lasagne.layers.get_output(network, deterministic=True)
