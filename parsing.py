@@ -190,9 +190,8 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
     # MLP layers
     # shape [batch, n-step, 100]
     for d in xrange(mlp):
-        bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.elu,
+        bi_lstm_cnn = lasagne.layers.DenseLayer(bi_lstm_cnn, 100, nonlinearity=nonlinearities.rectify,
                                                 num_leading_axes=2, name='dense%d' % d)
-        bi_lstm_cnn = lasagne.layers.DropoutLayer(bi_lstm_cnn, p=0.33, shared_axes=(1,))
 
     return TreeBiAffineCRFLayer(bi_lstm_cnn, num_types, mask_input=mask, name='crf')
 
