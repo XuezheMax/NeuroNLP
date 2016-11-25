@@ -387,7 +387,8 @@ def main():
     test_inst = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
-        print 'Epoch %d (learning rate=%.5f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
+        print 'Epoch %d (learning rate=%.5f, decay rate=%.4f, beta1=%.3f, beta2=%.3f): ' % (
+            epoch, lr, decay_rate, beta1, beta2)
         train_err = 0.0
         train_inst = 0
         start_time = time.time()
