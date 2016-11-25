@@ -27,7 +27,7 @@ from neuronlp.tasks import parser
 
 
 def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
-                  depth, num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, mlp=1,
+                  depth, num_units, num_types, grad_clipping=5.0, num_filters=30, p=0.5, mlp=1, peepholes=False,
                   use_char=False, use_pos=False, normalize_digits=True,
                   embedding='glove', embedding_path='data/glove/glove.6B/glove.6B.100d.gz',
                   char_embedding='random', char_path=None):
@@ -113,7 +113,7 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
             cell_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                                 nonlinearity=nonlinearities.tanh)
             lstm_forward = LSTMLayer(lstm_forward, num_units, mask_input=mask, grad_clipping=grad_clipping,
-                                     nonlinearity=nonlinearities.tanh, peepholes=False,
+                                     nonlinearity=nonlinearities.tanh, peepholes=peepholes,
                                      ingate=ingate_forward, outgate=outgate_forward,
                                      forgetgate=forgetgate_forward, cell=cell_forward, p=p, name='forward%d' % d)
             lstm_forward = lasagne.layers.DropoutLayer(lstm_forward, p=0.33, shared_axes=(1,))
@@ -129,7 +129,7 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
             cell_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                                  nonlinearity=nonlinearities.tanh)
             lstm_backward = LSTMLayer(lstm_backward, num_units, mask_input=mask, grad_clipping=grad_clipping,
-                                      nonlinearity=nonlinearities.tanh, peepholes=False, backwards=True,
+                                      nonlinearity=nonlinearities.tanh, peepholes=peepholes, backwards=True,
                                       ingate=ingate_backward, outgate=outgate_backward,
                                       forgetgate=forgetgate_backward, cell=cell_backward, p=p, name='backward%d' % d)
             lstm_backward = lasagne.layers.DropoutLayer(lstm_backward, p=0.33, shared_axes=(1,))
@@ -163,6 +163,9 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
 
     if use_char:
         layer_char_input = construct_char_input_layer()
+        # dropout before CNN
+        # TODO
+        # layer_char_input = lasagne.layers.DropoutLayer(layer_char_input, p=0.15)
         # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
         conv_window = 3
         # shape = [batch, n-step, c_dim, char_length]
@@ -236,6 +239,7 @@ def main():
     args_parser.add_argument('--learning_rate', type=float, default=0.1, help='Learning rate')
     args_parser.add_argument('--decay_rate', type=float, default=0.1, help='Decay rate of learning rate')
     args_parser.add_argument('--grad_clipping', type=float, default=0, help='Gradient clipping')
+    args_parser.add_argument('--peepholes', action='store_true', help='Peepholes for LSTM')
     args_parser.add_argument('--max_norm', type=float, default=0, help='weight for max-norm regularization')
     args_parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
     args_parser.add_argument('--beta2', type=float, default=0.9, help='beta2 for adam')
@@ -279,6 +283,7 @@ def main():
     regular = args.regular
     opt = args.opt
     grad_clipping = args.grad_clipping
+    peepholes = args.peepholes
     gamma = args.gamma
     delta = args.delta
     max_norm = args.max_norm
@@ -337,13 +342,14 @@ def main():
     char_var = T.itensor3(name='char-inputs')
 
     network = build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alphabet, pos_alphabet,
-                            depth, num_units, num_types, grad_clipping, num_filters, p=dropout, mlp=mlp,
+                            depth, num_units, num_types, grad_clipping, num_filters,
+                            p=dropout, mlp=mlp, peepholes=peepholes,
                             use_char=use_char, use_pos=use_pos, normalize_digits=normalize_digits,
                             embedding=embedding, embedding_path=embedding_path,
                             char_embedding=char_embedding, char_path=char_path)
 
-    logger.info(
-        "Network: depth=%d, hidden=%d, filter=%d, dropout=%s, #mlp=%d" % (depth, num_units, num_filters, dropout, mlp))
+    logger.info("Network: depth=%d, hidden=%d, peepholes=%s, filter=%d, dropout=%s, #mlp=%d" % (
+        depth, num_units, peepholes, num_filters, dropout, mlp))
     # compute loss
     energies_train = lasagne.layers.get_output(network)
     energies_eval = lasagne.layers.get_output(network, deterministic=True)
