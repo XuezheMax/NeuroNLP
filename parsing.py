@@ -238,6 +238,7 @@ def main():
     args_parser.add_argument('--grad_clipping', type=float, default=0, help='Gradient clipping')
     args_parser.add_argument('--max_norm', type=float, default=0, help='weight for max-norm regularization')
     args_parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
+    args_parser.add_argument('--beta2', type=float, default=0.9, help='beta2 for adam')
     args_parser.add_argument('--delta', type=float, default=0.0, help='weight for expectation-linear regularization')
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     args_parser.add_argument('--opt', choices=['adam', 'momentum'], help='optimization algorithm', required=True)
@@ -283,7 +284,7 @@ def main():
     learning_rate = args.learning_rate
     momentum = 0.9
     beta1 = 0.9
-    beta2 = 0.9
+    beta2 = args.beta2
     decay_rate = args.decay_rate
     schedule = args.schedule
     use_pos = args.pos
@@ -498,8 +499,9 @@ def main():
             best_epoch)
 
         # if epoch in schedule:
-        if epoch in schedule:
-            lr = lr * decay_rate
+        if epoch % schedule == 0:
+            # lr = lr * decay_rate
+            lr = learning_rate / (1.0 + epoch * decay_rate)
             updates = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2)
             train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
                                        updates=updates, on_unused_input='warn')
