@@ -243,8 +243,8 @@ def main():
     args_parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     args_parser.add_argument('--opt', choices=['adam', 'momentum'], help='optimization algorithm', required=True)
     args_parser.add_argument('--dropout', type=float, default=0.5, help='dropout rate')
-    # args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay', required=True)
-    args_parser.add_argument('--schedule', type=int, help='schedule for learning rate decay', required=True)
+    args_parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay', required=True)
+    # args_parser.add_argument('--schedule', type=int, help='schedule for learning rate decay', required=True)
     args_parser.add_argument('--pos', action='store_true', help='using pos embedding')
     args_parser.add_argument('--char', action='store_true', help='using cnn for character embedding')
     args_parser.add_argument('--normalize_digits', action='store_true', help='normalize digits')
@@ -500,10 +500,10 @@ def main():
             test_ucorrect_nopunct * 100 / test_total_nopunc, test_lcorrect_nopunct * 100 / test_total_nopunc,
             best_epoch)
 
-        # if epoch in schedule:
-        if epoch % schedule == 0:
-            # lr = lr * decay_rate
-            lr = learning_rate / (1.0 + epoch * decay_rate)
+        if epoch in schedule:
+        # if epoch % schedule == 0:
+            lr = lr * decay_rate
+            # lr = learning_rate / (1.0 + epoch * decay_rate)
             updates = create_updates(loss_train, network, opt, lr, momentum, beta1, beta2)
             train_fn = theano.function([word_var, char_var, pos_var, head_var, type_var, mask_var], loss_train,
                                        updates=updates, on_unused_input='warn')
