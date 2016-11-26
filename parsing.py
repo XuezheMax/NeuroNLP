@@ -143,7 +143,7 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
                                                                        normalize_digits=normalize_digits)
 
     WORD_DIM = embedd_dim
-    POS_DIM = WORD_DIM
+    POS_DIM = 50
     CHARACTER_DIM = 50
 
     word_table = construct_word_embedding_table()
