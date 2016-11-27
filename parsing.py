@@ -165,7 +165,7 @@ def build_network(word_var, char_var, pos_var, mask_var, word_alphabet, char_alp
         layer_char_input = construct_char_input_layer()
         # dropout before CNN
         # TODO
-        # layer_char_input = lasagne.layers.DropoutLayer(layer_char_input, p=0.15)
+        layer_char_input = lasagne.layers.DropoutLayer(layer_char_input, p=0.15)
         # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
         conv_window = 3
         # shape = [batch, n-step, c_dim, char_length]
