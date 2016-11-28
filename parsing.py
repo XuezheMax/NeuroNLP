@@ -312,7 +312,7 @@ def main():
 
     logger.info("Creating Alphabets: normalize_digits=%s" % normalize_digits)
     word_alphabet, char_alphabet, \
-    pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/", [train_path,], 60000, min_occurence=0,
+    pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/", [train_path, dev_path], 60000,
                                                               normalize_digits=normalize_digits)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     logger.info("Character Alphabet Size: %d" % char_alphabet.size())
