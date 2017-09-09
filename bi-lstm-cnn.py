@@ -20,8 +20,6 @@ from neuronlp import utils
 from neuronlp.layers.recurrent import LSTMLayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
 from neuronlp.layers.pool import PoolTimeStep1DLayer
-from neuronlp.layers.crf import ChainCRFLayer
-from neuronlp.objectives import chain_crf_loss, chain_crf_accuracy
 
 WORD_DIM = 100
 CHARACTER_DIM = 30
