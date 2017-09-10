@@ -117,7 +117,7 @@ def main():
     NUM_UNITS = args.num_units
     BINOMINAL = args.binominal
 
-    filename = '%s.%s.dim=%d' % ('binominal' if BINOMINAL else 'uniform', 'taru', NUM_UNITS)
+    filename = 'tmp/%s.%s.dim=%d' % ('binominal' if BINOMINAL else 'uniform', 'taru', NUM_UNITS)
     fp = open(filename, 'w')
     print 'data: %s' % ('binominal' if BINOMINAL else 'uniform')
     num_runs = 100
