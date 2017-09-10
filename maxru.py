@@ -125,7 +125,7 @@ def main():
     print 'data: %s' % ('binominal' if BINOMINAL else 'uniform')
     num_runs = 100
     exe = exe_maxru
-    for length in [20, 40, 50]:
+    for length in [10, 20, 40, 50]:
         result = 0.
         position = 0
         print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('maxru', NUM_UNITS, length, position)
