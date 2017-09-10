@@ -13,7 +13,7 @@ import theano
 import theano.tensor as T
 from lasagne.layers import Gate
 from lasagne import nonlinearities
-from lasagne.updates import nesterov_momentum
+from lasagne.updates import nesterov_momentum, adam
 
 from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
@@ -350,7 +350,8 @@ def main():
     corr_eval = (corr_eval * mask_var_flatten).sum(dtype=theano.config.floatX)
 
     params = lasagne.layers.get_all_params(network, trainable=True)
-    updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
+    # updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
+    updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
