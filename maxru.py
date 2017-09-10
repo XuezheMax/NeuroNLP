@@ -33,21 +33,22 @@ def train(layer_output, input_var, target_var, W, U, b, batch_size, length, posi
     loss = lasagne.objectives.binary_crossentropy(predictions, target_var)
     loss = loss.sum()
 
-    learning_rate = 0.01
+    learning_rate = 0.001
     steps_per_epoch = 1000
     params = lasagne.layers.get_all_params(layer_output, trainable=True)
-    updates = lasagne.updates.sgd(loss, params=params, learning_rate=learning_rate)
-    # updates = lasagne.updates.adam(loss, params=params, learning_rate=learning_rate)
+    # updates = lasagne.updates.sgd(loss, params=params, learning_rate=learning_rate)
+    updates = lasagne.updates.adam(loss, params=params, learning_rate=learning_rate)
     train_fn = theano.function([input_var, target_var], [loss, acc, W, U, b, predictions], updates=updates)
 
-    accuracies = np.zeros(1000)
-    for epoch in range(1000):
+    num_epoches = 500
+    accuracies = np.zeros(num_epoches)
+    for epoch in xrange(num_epoches):
         start_time = time.time()
         print 'Epoch %d (learning rate=%.4f)' % (epoch, learning_rate)
         loss = 0.0
         correct = 0.0
         num_back = 0
-        for step in range(steps_per_epoch):
+        for step in xrange(steps_per_epoch):
             x, y = get_batch(batch_size, position, binominal, length)
             err, corr, w, u, b, pred = train_fn(x, y)
             # print x
@@ -70,7 +71,7 @@ def train(layer_output, input_var, target_var, W, U, b, batch_size, length, posi
         print 'inst: %d loss: %.4f, corr: %d, acc: %.2f%%, time: %.2fs' % (
             num_inst, loss / num_inst, correct, correct * 100 / num_inst, time.time() - start_time)
 
-    return accuracies[-100:].mean()
+    return accuracies[-50:].mean()
 
 
 def exe_maxru(length, num_units, position, binominal):
@@ -131,7 +132,7 @@ def main():
         print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('maxru', NUM_UNITS, length, position)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
-        for run in range(num_runs):
+        for run in xrange(num_runs):
             acc = exe(length, NUM_UNITS, position, BINOMINAL)
             fp.write('%.2f, ' % acc)
             result = result + acc
@@ -145,7 +146,7 @@ def main():
         print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('taru', NUM_UNITS, length, position)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
-        for run in range(num_runs):
+        for run in xrange(num_runs):
             acc = exe(length, NUM_UNITS, position, BINOMINAL)
             fp.write('%.2f, ' % acc)
             result = result + acc
