@@ -100,7 +100,7 @@ class CustomRecurrentLayer(MergeLayer):
                  precompute_input=True,
                  mask_input=None,
                  only_return_final=False,
-                 p=0.5,
+                 p=0.,
                  **kwargs):
 
         # This layer inherits from a MergeLayer, because it can have three
@@ -311,14 +311,9 @@ class CustomRecurrentLayer(MergeLayer):
 
         # Create single recurrent computation step function
         def step(input_n, hid_previous, *args):
-            # check dropout
-            if deterministic or self.p == 0:
-                hid_input = hid_previous
-            else:
-                hid_input = (hid_previous / retain_prob) * dropout_mask
             # Compute the hidden-to-hidden activation
             hid_pre = helper.get_output(
-                self.hidden_to_hidden, hid_input, **kwargs)
+                self.hidden_to_hidden, hid_previous, **kwargs)
 
             # If the dot product is precomputed then add it, otherwise
             # calculate the input_to_hidden values and add them
@@ -333,7 +328,10 @@ class CustomRecurrentLayer(MergeLayer):
                 hid_pre = theano.gradient.grad_clip(
                     hid_pre, -self.grad_clipping, self.grad_clipping)
 
-            return self.nonlinearity(hid_pre)
+            hid = self.nonlinearity(hid_pre)
+            if not deterministic and self.p:
+                hid = (hid / retain_prob) * dropout_mask
+            return hid
 
         def step_masked(input_n, mask_n, hid_previous, *args):
             # Skip over any input with mask 0 by copying the previous
@@ -350,9 +348,6 @@ class CustomRecurrentLayer(MergeLayer):
             sequences = input
             step_fun = step
 
-        if not deterministic and self.p:
-            non_seqs += [dropout_mask]
-
         if not isinstance(self.hid_init, Layer):
             # The code below simply repeats self.hid_init num_batch times in
             # its first dimension.  Turns out using a dot product and a
@@ -361,6 +356,12 @@ class CustomRecurrentLayer(MergeLayer):
                         [0, self.hid_init.ndim - 1])
             hid_init = T.dot(T.ones((num_batch, 1)),
                              self.hid_init.dimshuffle(dot_dims))
+
+        if not deterministic and self.p:
+            one = T.constant(1)
+            retain_prob = one - self.p
+            hid_init = (hid_init / retain_prob) * dropout_mask
+            non_seqs += [dropout_mask, retain_prob]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
@@ -470,7 +471,7 @@ class RecurrentLayer(CustomRecurrentLayer):
                  precompute_input=True,
                  mask_input=None,
                  only_return_final=False,
-                 p=0.5,
+                 p=0.,
                  **kwargs):
 
         if isinstance(incoming, tuple):
@@ -602,7 +603,7 @@ class LSTMLayer(MergeLayer):
                  precompute_input=True,
                  mask_input=None,
                  only_return_final=False,
-                 p=0.5,
+                 p=0.,
                  **kwargs):
 
         # This layer inherits from a MergeLayer, because it can have four
@@ -818,12 +819,8 @@ class LSTMLayer(MergeLayer):
             if not self.precompute_input:
                 input_n = T.dot(input_n, W_in_stacked) + b_stacked
 
-            if deterministic or self.p == 0:
-                hid_input = hid_previous
-            else:
-                hid_input = (hid_previous / retain_prob) * dropout_mask
             # Calculate gates pre-activations and slice
-            gates = input_n + T.dot(hid_input, W_hid_stacked)
+            gates = input_n + T.dot(hid_previous, W_hid_stacked)
 
             # Clip gradients
             if self.grad_clipping:
@@ -855,6 +852,10 @@ class LSTMLayer(MergeLayer):
 
             # Compute new hidden unit activation
             hid = outgate*self.nonlinearity(cell)
+            # check dropout
+            if not deterministic and self.p:
+                cell = (cell / retain_prob) * dropout_mask
+                hid = (hid / retain_prob) * dropout_mask
             return [cell, hid]
 
         def step_masked(input_n, mask_n, cell_previous, hid_previous, *args):
@@ -901,7 +902,11 @@ class LSTMLayer(MergeLayer):
             non_seqs += [W_in_stacked, b_stacked]
 
         if not deterministic and self.p:
-            non_seqs += [dropout_mask]
+            one = T.constant(1)
+            retain_prob = one - self.p
+            cell_init = (cell_init / retain_prob) * dropout_mask
+            hid_init = (hid_init / retain_prob) * dropout_mask
+            non_seqs += [dropout_mask, retain_prob]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
@@ -1011,7 +1016,7 @@ class GRULayer(MergeLayer):
                  precompute_input=True,
                  mask_input=None,
                  only_return_final=False,
-                 p=0.5,
+                 p=0.,
                  **kwargs):
 
         # This layer inherits from a MergeLayer, because it can have three
@@ -1179,13 +1184,8 @@ class GRULayer(MergeLayer):
         # Create single recurrent computation step function
         # input__n is the n'th vector of the input
         def step(input_n, hid_previous, *args):
-            # check dropout
-            if deterministic or self.p == 0:
-                hid_previous_dropped = hid_previous
-            else:
-                hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask
             # Compute W_{hr} h_{t - 1}, W_{hu} h_{t - 1}, and W_{hc} h_{t - 1}
-            hid_input = T.dot(hid_previous_dropped, W_hid_stacked)
+            hid_input = T.dot(hid_previous, W_hid_stacked)
 
             if self.grad_clipping:
                 input_n = theano.gradient.grad_clip(
@@ -1213,7 +1213,10 @@ class GRULayer(MergeLayer):
             hidden_update = self.nonlinearity_hid(hidden_update)
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
-            hid = (1 - updategate)*hid_previous_dropped + updategate*hidden_update
+            hid = (1 - updategate)*hid_previous + updategate*hidden_update
+            # check dropout
+            if not deterministic and self.p:
+                hid = (hid / retain_prob) * dropout_mask
             return hid
 
         def step_masked(input_n, mask_n, hid_previous, *args):
@@ -1248,7 +1251,10 @@ class GRULayer(MergeLayer):
             non_seqs += [W_in_stacked, b_stacked]
 
         if not deterministic and self.p:
-            non_seqs += [dropout_mask]
+            one = T.constant(1)
+            retain_prob = one - self.p
+            hid_init = (hid_init / retain_prob) * dropout_mask
+            non_seqs += [dropout_mask, retain_prob]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
@@ -1574,13 +1580,8 @@ class TARULayer(MergeLayer):
         # Create single recurrent computation step function
         # input__n is the n'th vector of the input
         def step(p_n, input_n, hid_previous, *args):
-            # check dropout
-            if deterministic or self.p == 0:
-                hid_previous_dropped = hid_previous
-            else:
-                hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask
             # Compute W_{hr} h_{t - 1}, W_{hu} h_{t - 1}, and W_{hc} h_{t - 1}
-            hid_input = T.dot(hid_previous_dropped, W_hid_stacked)
+            hid_input = T.dot(hid_previous, W_hid_stacked)
 
             if self.grad_clipping:
                 input_n = theano.gradient.grad_clip(
@@ -1623,7 +1624,10 @@ class TARULayer(MergeLayer):
             hidden_update = self.nonlinearity_hid(hidden_update)
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
-            hid = (1 - updategate)*hid_previous_dropped + updategate*hidden_update
+            hid = (1 - updategate)*hid_previous + updategate*hidden_update
+            # check dropout
+            if not deterministic and self.p:
+                hid = (hid / retain_prob) * dropout_mask
             return hid
 
         def step_masked(p_n, input_n, mask_n, hid_previous, *args):
@@ -1658,7 +1662,10 @@ class TARULayer(MergeLayer):
             non_seqs += [W_in_stacked, b_stacked]
 
         if not deterministic and self.p:
-            non_seqs += [dropout_mask]
+            one = T.constant(1)
+            retain_prob = one - self.p
+            hid_init = (hid_init / retain_prob) * dropout_mask
+            non_seqs += [dropout_mask, retain_prob]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
