@@ -8,7 +8,7 @@ import theano
 import lasagne
 
 import lasagne.nonlinearities as nonlinearities
-from neuronlp.layers import TARULayer
+from neuronlp.layers import MAXRULayer
 from lasagne.layers import Gate, DenseLayer
 
 BATCH_SIZE = 128
@@ -73,7 +73,7 @@ def train(layer_output, input_var, target_var, W, U, b, batch_size, length, posi
     return accuracies[-100:].mean()
 
 
-def exe_taru(length, num_units, position, binominal):
+def exe_maxru(length, num_units, position, binominal):
     batch_size = BATCH_SIZE
 
     input_var = T.tensor3(name='inputs', dtype=theano.config.floatX)
@@ -95,10 +95,11 @@ def exe_taru(length, num_units, position, binominal):
     hiden_update = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                         b=lasagne.init.Constant(0.), nonlinearity=nonlinearities.tanh)
 
-    layer_taru = TARULayer(layer_input, num_units, max_length=length, P_time=lasagne.init.GlorotUniform(),
-                           resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
-                           time_updategate=time_updategate, time_update=time_update,
-                           only_return_final=True, name='TARU', p=0.)
+    layer_taru = MAXRULayer(layer_input, num_units, max_length=length,
+                            P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
+                            resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
+                            time_updategate=time_updategate, time_update=time_update,
+                            only_return_final=True, name='MAXRU', p=0.)
 
     W = layer_taru.W_hid_to_hidden_update.sum()
     U = layer_taru.W_in_to_hidden_update.sum()
@@ -108,10 +109,12 @@ def exe_taru(length, num_units, position, binominal):
 
     return train(layer_output, input_var, target_var, W, U, b, batch_size, length, position, binominal)
 
+
 def main():
     parser = argparse.ArgumentParser(description='Tuning with bi-directional RNN')
     parser.add_argument('--num_units', type=int, default=2, help='Number of units')
-    parser.add_argument('--binominal', action='store_true', help='If the data are sampled from bi-nominal distribution.')
+    parser.add_argument('--binominal', action='store_true',
+                        help='If the data are sampled from bi-nominal distribution.')
     args = parser.parse_args()
 
     NUM_UNITS = args.num_units
@@ -121,14 +124,15 @@ def main():
     fp = open(filename, 'w')
     print 'data: %s' % ('binominal' if BINOMINAL else 'uniform')
     num_runs = 100
+    exe = exe_maxru
     for length in [20, 40, 50]:
         result = 0.
         position = 0
-        print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('taru', NUM_UNITS, length, position)
+        print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('maxru', NUM_UNITS, length, position)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
         for run in range(num_runs):
-            acc = exe_taru(length, NUM_UNITS, position, BINOMINAL)
+            acc = exe(length, NUM_UNITS, position, BINOMINAL)
             fp.write('%.2f, ' % acc)
             result = result + acc
             fp.flush()
@@ -142,7 +146,7 @@ def main():
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
         for run in range(num_runs):
-            acc = exe_taru(length, NUM_UNITS, position, BINOMINAL)
+            acc = exe(length, NUM_UNITS, position, BINOMINAL)
             fp.write('%.2f, ' % acc)
             result = result + acc
             fp.flush()

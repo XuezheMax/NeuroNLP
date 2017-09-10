@@ -17,7 +17,7 @@ from lasagne.updates import nesterov_momentum, adam
 
 from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
-from neuronlp.layers.recurrent import TARULayer
+from neuronlp.layers.recurrent import MAXRULayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
 from neuronlp.layers.pool import PoolTimeStep1DLayer
 
@@ -63,8 +63,8 @@ def build_std_dropout(incoming1, incoming2, num_units, num_time_units, max_lengt
     hiden_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                                 nonlinearity=nonlinearities.tanh)
 
-    taru_forward = TARULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
-                             P_time=lasagne.init.GlorotUniform(),
+    maxru_forward = MAXRULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
+                             P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
                              resetgate=resetgate_forward, updategate=updategate_forward,
                              hidden_update=hiden_update_forward,
                              time_updategate=time_updategate_forward, time_update=time_update_forward,
@@ -81,23 +81,23 @@ def build_std_dropout(incoming1, incoming2, num_units, num_time_units, max_lengt
     hiden_update_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                                  nonlinearity=nonlinearities.tanh)
 
-    taru_backward = TARULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
-                              P_time=lasagne.init.GlorotUniform(),
+    maxru_backward = MAXRULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
+                              P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
                               resetgate=resetgate_backward, updategate=updategate_backward,
                               hidden_update=hiden_update_backward,
                               time_updategate=time_updategate_backward, time_update=time_update_backward,
                               grad_clipping=grad_clipping, p=0., backwards=True, name='backward')
 
     # concatenate the outputs of forward and backward LSTMs to combine them.
-    bi_taru_cnn = lasagne.layers.concat([taru_forward, taru_backward], axis=2, name="bi-lstm")
+    bi_maxru_cnn = lasagne.layers.concat([maxru_forward, maxru_backward], axis=2, name="bi-maxru-cnn")
 
-    bi_taru_cnn = lasagne.layers.DropoutLayer(bi_taru_cnn, p=p)
+    bi_maxru_cnn = lasagne.layers.DropoutLayer(bi_maxru_cnn, p=p)
 
     # reshape bi-rnn-cnn to [batch * max_length, num_units]
-    bi_taru_cnn = lasagne.layers.reshape(bi_taru_cnn, (-1, [2]))
+    bi_maxru_cnn = lasagne.layers.reshape(bi_maxru_cnn, (-1, [2]))
 
     # construct output layer (dense layer with softmax)
-    layer_output = lasagne.layers.DenseLayer(bi_taru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
+    layer_output = lasagne.layers.DenseLayer(bi_maxru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
                                              name='softmax')
 
     return layer_output
@@ -139,8 +139,8 @@ def build_recur_dropout(incoming1, incoming2, num_units, num_time_units, max_len
     hiden_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                                 nonlinearity=nonlinearities.tanh)
 
-    taru_forward = TARULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
-                             P_time=lasagne.init.GlorotUniform(),
+    maxru_forward = MAXRULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
+                             P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
                              resetgate=resetgate_forward, updategate=updategate_forward,
                              hidden_update=hiden_update_forward,
                              time_updategate=time_updategate_forward, time_update=time_update_forward,
@@ -157,23 +157,23 @@ def build_recur_dropout(incoming1, incoming2, num_units, num_time_units, max_len
     hiden_update_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                                  nonlinearity=nonlinearities.tanh)
 
-    taru_backward = TARULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
-                              P_time=lasagne.init.GlorotUniform(),
+    maxru_backward = MAXRULayer(incoming, num_units, num_time_units, max_length, mask_input=mask,
+                              P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
                               resetgate=resetgate_backward, updategate=updategate_backward,
                               hidden_update=hiden_update_backward,
                               time_updategate=time_updategate_backward, time_update=time_update_backward,
                               grad_clipping=grad_clipping, p=p, backwards=True, name='backward')
 
     # concatenate the outputs of forward and backward LSTMs to combine them.
-    bi_taru_cnn = lasagne.layers.concat([taru_forward, taru_backward], axis=2, name="bi-lstm")
+    bi_maxru_cnn = lasagne.layers.concat([maxru_forward, maxru_backward], axis=2, name="bi-maxru-cnn")
     # shape = [batch, n-step, num_units]
-    bi_taru_cnn = lasagne.layers.DropoutLayer(bi_taru_cnn, p=p, shared_axes=(1,))
+    bi_maxru_cnn = lasagne.layers.DropoutLayer(bi_maxru_cnn, p=p, shared_axes=(1,))
 
     # reshape bi-rnn-cnn to [batch * max_length, num_units]
-    bi_taru_cnn = lasagne.layers.reshape(bi_taru_cnn, (-1, [2]))
+    bi_maxru_cnn = lasagne.layers.reshape(bi_maxru_cnn, (-1, [2]))
 
     # construct output layer (dense layer with softmax)
-    layer_output = lasagne.layers.DenseLayer(bi_taru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
+    layer_output = lasagne.layers.DenseLayer(bi_maxru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
                                              name='softmax')
 
     return layer_output
@@ -241,7 +241,7 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, dr
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Tuning with bi-directional TARU-CNN')
+    parser = argparse.ArgumentParser(description='Tuning with bi-directional MAXRU-CNN')
     parser.add_argument('--num_epochs', type=int, default=1000, help='Number of training epochs')
     parser.add_argument('--batch_size', type=int, default=16, help='Number of sentences in each batch')
     parser.add_argument('--num_units', type=int, default=100, help='Number of hidden units in TARU')
@@ -261,7 +261,7 @@ def main():
 
     args = parser.parse_args()
 
-    logger = get_logger("Sequence Labeling (TARU-CNN)")
+    logger = get_logger("Sequence Labeling (MAXRU-CNN)")
     train_path = args.train
     dev_path = args.dev
     test_path = args.test
