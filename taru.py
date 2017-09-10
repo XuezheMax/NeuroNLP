@@ -117,10 +117,40 @@ def main():
     NUM_UNITS = args.num_units
     BINOMINAL = args.binominal
 
-    length = 20
-    position = 0
-    print '%s, dim=%d, length=%d, postion=%d' % ('binominal' if BINOMINAL else 'uniform', NUM_UNITS, length, position)
-    exe_taru(length, NUM_UNITS, position, BINOMINAL)
+    filename = '%s.%s.dim=%d' % ('binominal' if BINOMINAL else 'uniform', 'taru', NUM_UNITS)
+    fp = open(filename, 'w')
+    print 'data: %s' % ('binominal' if BINOMINAL else 'uniform')
+    num_runs = 100
+    for length in [5, 10, 20, 40, 50]:
+        result = 0.
+        position = 0
+        print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('taru', NUM_UNITS, length, position)
+        fp.write('length=%d, pos=%d:\n' % (length, position))
+        fp.flush()
+        for run in range(num_runs):
+            acc = exe_taru(length, NUM_UNITS, position, BINOMINAL)
+            fp.write('%.2f, ' % acc)
+            result = result + acc
+            fp.flush()
+
+        fp.write('%.2f\n\n' % (result / num_runs))
+        fp.flush()
+
+        result = 0.
+        position = (length - 1) / 2
+        print 'architecture: %s (dim=%d, length=%d, postion=%d)' % ('taru', NUM_UNITS, length, position)
+        fp.write('length=%d, pos=%d:\n' % (length, position))
+        fp.flush()
+        for run in range(num_runs):
+            acc = exe_taru(length, NUM_UNITS, position, BINOMINAL)
+            fp.write('%.2f, ' % acc)
+            result = result + acc
+            fp.flush()
+
+        fp.write('%.2f\n\n' % (result / num_runs))
+        fp.flush()
+
+    fp.close()
 
 
 if __name__ == '__main__':
