@@ -112,10 +112,10 @@ class CustomRecurrentLayer(MergeLayer):
         self.hid_init_incoming_index = -1
         if mask_input is not None:
             incomings.append(mask_input)
-            self.mask_incoming_index = len(incomings)-1
+            self.mask_incoming_index = len(incomings) - 1
         if isinstance(hid_init, Layer):
             incomings.append(hid_init)
-            self.hid_init_incoming_index = len(incomings)-1
+            self.hid_init_incoming_index = len(incomings) - 1
 
         super(CustomRecurrentLayer, self).__init__(incomings, **kwargs)
 
@@ -150,7 +150,7 @@ class CustomRecurrentLayer(MergeLayer):
                     input_shape[0] is not None and
                     input_shape[1] is not None and
                 (input_to_hidden.output_shape[0] !=
-                         input_shape[0]*input_shape[1])):
+                         input_shape[0] * input_shape[1])):
             raise ValueError(
                 'When precompute_input == True, '
                 'input_to_hidden.output_shape[0] must equal '
@@ -159,7 +159,7 @@ class CustomRecurrentLayer(MergeLayer):
                 'input_to_hidden.output_shape[0] = {} and '
                 'incoming.output_shape[0]*incoming.output_shape[1] = '
                 '{}'.format(input_to_hidden.output_shape[0],
-                            input_shape[0]*input_shape[1]))
+                            input_shape[0] * input_shape[1]))
 
         # Check that the first dimension of input_to_hidden and
         # hidden_to_hidden's outputs match when we won't precompute the input
@@ -294,7 +294,7 @@ class CustomRecurrentLayer(MergeLayer):
             # This strange use of a generator in a tuple was because
             # input.shape[2:] was raising a Theano error
             trailing_dims = tuple(input.shape[n] for n in range(2, input.ndim))
-            input = T.reshape(input, (seq_len*num_batch,) + trailing_dims)
+            input = T.reshape(input, (seq_len * num_batch,) + trailing_dims)
             input = helper.get_output(
                 self.input_to_hidden, input, **kwargs)
 
@@ -457,6 +457,7 @@ class RecurrentLayer(CustomRecurrentLayer):
     p : float or scalar tensor
         The probability of recurrent dropout (if p=0, no dropout is applied)
     """
+
     def __init__(self, incoming, num_units,
                  W_in_to_hid=init.Uniform(),
                  W_hid_to_hid=init.Uniform(),
@@ -617,13 +618,13 @@ class LSTMLayer(MergeLayer):
         self.cell_init_incoming_index = -1
         if mask_input is not None:
             incomings.append(mask_input)
-            self.mask_incoming_index = len(incomings)-1
+            self.mask_incoming_index = len(incomings) - 1
         if isinstance(hid_init, Layer):
             incomings.append(hid_init)
-            self.hid_init_incoming_index = len(incomings)-1
+            self.hid_init_incoming_index = len(incomings) - 1
         if isinstance(cell_init, Layer):
             incomings.append(cell_init)
-            self.cell_init_incoming_index = len(incomings)-1
+            self.cell_init_incoming_index = len(incomings) - 1
 
         # Initialize parent layer
         super(LSTMLayer, self).__init__(incomings, **kwargs)
@@ -690,13 +691,13 @@ class LSTMLayer(MergeLayer):
         # state, so they are represented as vectors.
         if self.peepholes:
             self.W_cell_to_ingate = self.add_param(
-                ingate.W_cell, (num_units, ), name="W_cell_to_ingate")
+                ingate.W_cell, (num_units,), name="W_cell_to_ingate")
 
             self.W_cell_to_forgetgate = self.add_param(
-                forgetgate.W_cell, (num_units, ), name="W_cell_to_forgetgate")
+                forgetgate.W_cell, (num_units,), name="W_cell_to_forgetgate")
 
             self.W_cell_to_outgate = self.add_param(
-                outgate.W_cell, (num_units, ), name="W_cell_to_outgate")
+                outgate.W_cell, (num_units,), name="W_cell_to_outgate")
 
         # Setup initial values for the cell and the hidden units
         if isinstance(cell_init, Layer):
@@ -811,7 +812,7 @@ class LSTMLayer(MergeLayer):
         # When theano.scan calls step, input_n will be (n_batch, 4*num_units).
         # We define a slicing function that extract the input to each LSTM gate
         def slice_w(x, n):
-            return x[:, n*self.num_units:(n+1)*self.num_units]
+            return x[:, n * self.num_units:(n + 1) * self.num_units]
 
         # Create single recurrent computation step function
         # input_n is the n'th vector of the input
@@ -835,8 +836,8 @@ class LSTMLayer(MergeLayer):
 
             if self.peepholes:
                 # Compute peephole connections
-                ingate += cell_previous*self.W_cell_to_ingate
-                forgetgate += cell_previous*self.W_cell_to_forgetgate
+                ingate += cell_previous * self.W_cell_to_ingate
+                forgetgate += cell_previous * self.W_cell_to_forgetgate
 
             # Apply nonlinearities
             ingate = self.nonlinearity_ingate(ingate)
@@ -844,14 +845,14 @@ class LSTMLayer(MergeLayer):
             cell_input = self.nonlinearity_cell(cell_input)
 
             # Compute new cell value
-            cell = forgetgate*cell_previous + ingate*cell_input
+            cell = forgetgate * cell_previous + ingate * cell_input
 
             if self.peepholes:
-                outgate += cell*self.W_cell_to_outgate
+                outgate += cell * self.W_cell_to_outgate
             outgate = self.nonlinearity_outgate(outgate)
 
             # Compute new hidden unit activation
-            hid = outgate*self.nonlinearity(cell)
+            hid = outgate * self.nonlinearity(cell)
             # check dropout
             if not deterministic and self.p:
                 cell = (cell / retain_prob) * dropout_mask
@@ -1028,10 +1029,10 @@ class GRULayer(MergeLayer):
         self.hid_init_incoming_index = -1
         if mask_input is not None:
             incomings.append(mask_input)
-            self.mask_incoming_index = len(incomings)-1
+            self.mask_incoming_index = len(incomings) - 1
         if isinstance(hid_init, Layer):
             incomings.append(hid_init)
-            self.hid_init_incoming_index = len(incomings)-1
+            self.hid_init_incoming_index = len(incomings) - 1
 
         # Initialize parent layer
         super(GRULayer, self).__init__(incomings, **kwargs)
@@ -1179,7 +1180,7 @@ class GRULayer(MergeLayer):
         # When theano.scan calls step, input_n will be (n_batch, 3*num_units).
         # We define a slicing function that extract the input to each GRU gate
         def slice_w(x, n):
-            return x[:, n*self.num_units:(n+1)*self.num_units]
+            return x[:, n * self.num_units:(n + 1) * self.num_units]
 
         # Create single recurrent computation step function
         # input__n is the n'th vector of the input
@@ -1206,14 +1207,14 @@ class GRULayer(MergeLayer):
             # Compute W_{xc}x_t + r_t \odot (W_{hc} h_{t - 1})
             hidden_update_in = slice_w(input_n, 2)
             hidden_update_hid = slice_w(hid_input, 2)
-            hidden_update = hidden_update_in + resetgate*hidden_update_hid
+            hidden_update = hidden_update_in + resetgate * hidden_update_hid
             if self.grad_clipping:
                 hidden_update = theano.gradient.grad_clip(
                     hidden_update, -self.grad_clipping, self.grad_clipping)
             hidden_update = self.nonlinearity_hid(hidden_update)
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
-            hid = (1 - updategate)*hid_previous + updategate*hidden_update
+            hid = (1 - updategate) * hid_previous + updategate * hidden_update
             # check dropout
             if not deterministic and self.p:
                 hid = (hid / retain_prob) * dropout_mask
@@ -1275,6 +1276,418 @@ class GRULayer(MergeLayer):
                 sequences=sequences,
                 go_backwards=self.backwards,
                 outputs_info=[hid_init],
+                non_sequences=non_seqs,
+                truncate_gradient=self.gradient_steps,
+                strict=True)[0]
+
+        # When it is requested that we only return the final sequence step,
+        # we need to slice it out immediately after scan is applied
+        if self.only_return_final:
+            hid_out = hid_out[-1]
+        else:
+            # dimshuffle back to (n_batch, n_time_steps, n_features))
+            hid_out = hid_out.dimshuffle(1, 0, 2)
+
+            # if scan is backward reverse the output
+            if self.backwards:
+                hid_out = hid_out[:, ::-1]
+
+        return hid_out
+
+
+class MAXRU_AALayer(MergeLayer):
+    """
+    MAXRULayer based on lasagne.layer.GRULayer, with recurrent dropout options.
+
+    Parameters
+    ----------
+    incoming : a :class:`lasagne.layers.Layer` instance or a tuple
+        The layer feeding into this layer, or the expected input shape.
+    num_units : int
+        Number of hidden units in the layer.
+    max_length : int
+        Max length of the input sequence.
+    P_time : Theano shared variable, numpy array or callable
+        Initializer for time matrix (:math:`P`).
+    nonlinearity : callable or None
+        The nonlinearity that is applied to the time parameters (:math:`P`). If
+        None is provided, no nonlinearity will be applied.
+    updategate : Gate
+        Parameters for the update gate (:math:`u_t`): :math:`W_{xu}`,
+        :math:`W_{hu}`, :math:`b_u`, and :math:`\sigma_u`.
+    hidden_update : Gate
+        Parameters for the hidden update (:math:`c_t`): :math:`W_{xc}`,
+        :math:`W_{hc}`, :math:`b_c`, and :math:`\sigma_c`.
+    time_updategate : Gate
+        Parameters for the time update gate (:math:`k_t`): :math:`W_{xk}`,
+        :math:`W_{hk}`, :math:`b_k`, and :math:`\sigma_k`.
+    time_update : Gate
+        Parameters for the time update (:math:`s_t`): :math:`W_{xs}`,
+        :math:`W_{hs}`, :math:`b_s`, and :math:`\sigma_s`.
+    hid_init : callable, np.ndarray, theano.shared or :class:`Layer`
+        Initializer for initial hidden state (:math:`h_0`).
+    time_init : callable, np.ndarray, theano.shared or :class:`Layer`
+        Initializer for initial time state (:math:`s_0`).
+    backwards : bool
+        If True, process the sequence backwards and then reverse the
+        output again such that the output from the layer is always
+        from :math:`x_1` to :math:`x_n`.
+    learn_init : bool
+        If True, initial hidden values are learned.
+    gradient_steps : int
+        Number of timesteps to include in the backpropagated gradient.
+        If -1, backpropagate through the entire sequence.
+    grad_clipping : float
+        If nonzero, the gradient messages are clipped to the given value during
+        the backward pass.  See [1]_ (p. 6) for further explanation.
+    unroll_scan : bool
+        If True the recursion is unrolled instead of using scan. For some
+        graphs this gives a significant speed up but it might also consume
+        more memory. When `unroll_scan` is True, backpropagation always
+        includes the full sequence, so `gradient_steps` must be set to -1 and
+        the input sequence length must be known at compile time (i.e., cannot
+        be given as None).
+    precompute_input : bool
+        If True, precompute input_to_hid before iterating through
+        the sequence. This can result in a speedup at the expense of
+        an increase in memory usage.
+    mask_input : :class:`lasagne.layers.Layer`
+        Layer which allows for a sequence mask to be input, for when sequences
+        are of variable length.  Default `None`, which means no mask will be
+        supplied (i.e. all sequences are of the same length).
+    only_return_final : bool
+        If True, only return the final sequential output (e.g. for tasks where
+        a single target value for the entire sequence is desired).  In this
+        case, Theano makes an optimization which saves memory.
+    p : float or scalar tensor
+        The probability of recurrent dropout (if p=0, no dropout is applied)
+    """
+
+    def __init__(self, incoming, num_units, max_length=100,
+                 P_time=init.Constant(0.),
+                 nonlinearity=nonlinearities.tanh,
+                 updategate=Gate(),
+                 hidden_update=Gate(W_cell=None, nonlinearity=nonlinearities.tanh),
+                 time_updategate=Gate(W_cell=None),
+                 time_update=Gate(W_cell=None, nonlinearity=nonlinearities.tanh),
+                 hid_init=init.Constant(0.),
+                 time_init=init.Constant(0.),
+                 backwards=False,
+                 learn_init=False,
+                 gradient_steps=-1,
+                 grad_clipping=0,
+                 unroll_scan=False,
+                 precompute_input=True,
+                 mask_input=None,
+                 only_return_final=False,
+                 p=0.,
+                 **kwargs):
+
+        # This layer inherits from a MergeLayer, because it can have three
+        # inputs - the layer input, the mask and the initial hidden state.  We
+        # will just provide the layer input as incomings, unless a mask input
+        # or initial hidden state was provided.
+        incomings = [incoming]
+        self.mask_incoming_index = -1
+        self.hid_init_incoming_index = -1
+        self.time_init_incoming_index = -1
+        if mask_input is not None:
+            incomings.append(mask_input)
+            self.mask_incoming_index = len(incomings) - 1
+        if isinstance(hid_init, Layer):
+            incomings.append(hid_init)
+            self.hid_init_incoming_index = len(incomings) - 1
+        if isinstance(time_init, Layer):
+            incomings.append(time_init)
+            self.time_init_incoming_index = len(incomings) - 1
+
+        # Initialize parent layer
+        super(MAXRU_AALayer, self).__init__(incomings, **kwargs)
+
+        self.learn_init = learn_init
+        self.num_units = num_units
+        self.max_length = max_length
+        self.grad_clipping = grad_clipping
+        self.backwards = backwards
+        self.gradient_steps = gradient_steps
+        self.unroll_scan = unroll_scan
+        self.precompute_input = precompute_input
+        self.only_return_final = only_return_final
+        self._srng = RandomStreams(get_rng().randint(1, 2147462579))
+        self.p = p
+
+        if unroll_scan and gradient_steps != -1:
+            raise ValueError(
+                "Gradient steps must be -1 when unroll_scan is true.")
+
+        # Retrieve the dimensionality of the incoming layer
+        input_shape = self.input_shapes[0]
+
+        if unroll_scan and input_shape[1] is None:
+            raise ValueError("Input sequence length cannot be specified as "
+                             "None when unroll_scan is True")
+
+        # Input dimensionality is the output dimensionality of the input layer
+        num_inputs = np.prod(input_shape[2:])
+
+        def add_gate_params(gate, gate_name):
+            """ Convenience function for adding layer parameters from a Gate
+            instance. """
+            return (self.add_param(gate.W_in, (num_inputs, num_units),
+                                   name="W_in_to_{}".format(gate_name)),
+                    self.add_param(gate.W_hid, (num_units, num_units),
+                                   name="W_hid_to_{}".format(gate_name)),
+                    self.add_param(gate.b, (num_units,),
+                                   name="b_{}".format(gate_name),
+                                   regularizable=False),
+                    gate.nonlinearity)
+
+        # Add in all parameters from gates
+        (self.W_in_to_time_updategate, self.W_hid_to_time_updategate, self.b_to_time_updategate,
+         self.nonlinearity_time_updategate) = add_gate_params(time_updategate, 'time_updategate')
+
+        (self.W_in_to_time_update, self.W_hid_to_time_update, self.b_to_time_update,
+         self.nonlinearity_time_update) = add_gate_params(time_update, 'time_update')
+
+        (self.W_in_to_updategate, self.W_hid_to_updategate, self.b_updategate,
+         self.nonlinearity_updategate) = add_gate_params(updategate, 'updategate')
+
+        (self.W_in_to_hidden_update, self.W_hid_to_hidden_update, self.b_hidden_update,
+         self.nonlinearity_hid) = add_gate_params(hidden_update, 'hidden_update')
+
+        self.W_state_to_updategate = self.add_param(updategate.W_cell, (num_units, num_units),
+                                                    name="W_state_to_updategate")
+
+        self.P_time = self.add_param(P_time, (max_length, num_units), name="P_time")
+        # If the provided nonlinearity is None, make it linear
+        if nonlinearity is None:
+            self.nonlinearity = nonlinearities.identity
+        else:
+            self.nonlinearity = nonlinearity
+
+        # Initialize hidden state
+        if isinstance(hid_init, Layer):
+            self.hid_init = hid_init
+        else:
+            self.hid_init = self.add_param(
+                hid_init, (1, self.num_units), name="hid_init",
+                trainable=learn_init, regularizable=False)
+        # Initialize time state
+        if isinstance(time_init, Layer):
+            self.time_init = time_init
+        else:
+            self.time_init = self.add_param(
+                time_init, (1, self.num_units), name="time_init",
+                trainable=learn_init, regularizable=False)
+
+    def get_output_shape_for(self, input_shapes):
+        # The shape of the input to this layer will be the first element
+        # of input_shapes, whether or not a mask input is being used.
+        input_shape = input_shapes[0]
+        # When only_return_final is true, the second (sequence step) dimension
+        # will be flattened
+        if self.only_return_final:
+            return input_shape[0], self.num_units
+        # Otherwise, the shape will be (n_batch, n_steps, num_units)
+        else:
+            return input_shape[0], input_shape[1], self.num_units
+
+    def get_output_for(self, inputs, deterministic=False, **kwargs):
+        """
+        Compute this layer's output function given a symbolic input variable
+
+        Parameters
+        ----------
+        inputs : list of theano.TensorType
+            `inputs[0]` should always be the symbolic input variable.  When
+            this layer has a mask input (i.e. was instantiated with
+            `mask_input != None`, indicating that the lengths of sequences in
+            each batch vary), `inputs` should have length 2, where `inputs[1]`
+            is the `mask`.  The `mask` should be supplied as a Theano variable
+            denoting whether each time step in each sequence in the batch is
+            part of the sequence or not.  `mask` should be a matrix of shape
+            ``(n_batch, n_time_steps)`` where ``mask[i, j] = 1`` when ``j <=
+            (length of sequence i)`` and ``mask[i, j] = 0`` when ``j > (length
+            of sequence i)``. When the hidden state of this layer is to be
+            pre-filled (i.e. was set to a :class:`Layer` instance) `inputs`
+            should have length at least 2, and `inputs[-1]` is the hidden state
+            to prefill with.
+
+        Returns
+        -------
+        layer_output : theano.TensorType
+            Symbolic output variable.
+        """
+        # Retrieve the layer input
+        input = inputs[0]
+        # Retrieve the mask when it is supplied
+        mask = None
+        hid_init = None
+        time_init = None
+        if self.mask_incoming_index > 0:
+            mask = inputs[self.mask_incoming_index]
+        if self.hid_init_incoming_index > 0:
+            hid_init = inputs[self.hid_init_incoming_index]
+        if self.time_init_incoming_index > 0:
+            time_init = inputs[self.time_init_incoming_index]
+
+        # Treat all dimensions after the second as flattened feature dimensions
+        if input.ndim > 3:
+            input = T.flatten(input, 3)
+
+        # Because scan iterates over the first dimension we dimshuffle to
+        # (n_time_steps, n_batch, n_features)
+        input = input.dimshuffle(1, 0, 2)
+        seq_len, num_batch, _ = input.shape
+        dropout_mask = None
+        if not deterministic and self.p:
+            one = T.constant(1)
+            retain_prob = one - self.p
+            dropout_mask_shape = (num_batch, self.num_units)
+            dropout_mask = self._srng.binomial(dropout_mask_shape, p=retain_prob, dtype=input.dtype)
+
+        # Stack input weight matrices into a (num_inputs, 3*num_units)
+        # matrix, which speeds up computation
+        W_in_stacked = T.concatenate([self.W_in_to_updategate, self.W_in_to_hidden_update,
+                                      self.W_in_to_time_updategate, self.W_in_to_time_update], axis=1)
+
+        # Same for hidden weight matrices
+        W_hid_stacked = T.concatenate([self.W_hid_to_updategate, self.W_hid_to_hidden_update,
+                                       self.W_hid_to_time_updategate, self.W_hid_to_time_update], axis=1)
+
+        # Stack gate biases into a (3*num_units) vector
+        b_stacked = T.concatenate([self.b_updategate, self.b_hidden_update,
+                                   self.b_to_time_updategate, self.b_to_time_update], axis=0)
+
+        W_state_stacked = self.W_state_to_updategate
+
+        if self.precompute_input:
+            # precompute_input inputs*W. W_in is (n_features, 3*num_units).
+            # input is then (n_batch, n_time_steps, 3*num_units).
+            input = T.dot(input, W_in_stacked) + b_stacked
+
+        # When theano.scan calls step, input_n will be (n_batch, 3*num_units).
+        # We define a slicing function that extract the input to each GRU gate
+        def slice_w(x, n):
+            return x[:, n * self.num_units:(n + 1) * self.num_units]
+
+        # Create single recurrent computation step function
+        # input__n is the n'th vector of the input
+        def step(p_n, input_n, time_previous, hid_previous, *args):
+            # Compute W_{hr} h_{t - 1}, W_{hu} h_{t - 1}, and W_{hc} h_{t - 1}
+            hid_input = T.dot(hid_previous, W_hid_stacked)
+
+            if self.grad_clipping:
+                input_n = theano.gradient.grad_clip(
+                    input_n, -self.grad_clipping, self.grad_clipping)
+                hid_input = theano.gradient.grad_clip(
+                    hid_input, -self.grad_clipping, self.grad_clipping)
+
+            if not self.precompute_input:
+                # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
+                input_n = T.dot(input_n, W_in_stacked) + b_stacked
+
+            # time update gates
+            time_updategate = slice_w(hid_input, 2) + slice_w(input_n, 2)
+            time_update = slice_w(hid_input, 3) + slice_w(input_n, 3)
+            time_updategate = self.nonlinearity_time_updategate(time_updategate)
+            time_update = self.nonlinearity_time_update(time_update)
+
+            # compute time_state
+            time = (1 - time_updategate) * time_previous + time_updategate * time_update
+            time = time * (self.nonlinearity(p_n))
+            # check dropout
+            if not deterministic and self.p:
+                time = (time / retain_prob) * dropout_mask
+
+            time_input = T.dot(time, W_state_stacked)
+
+            if self.grad_clipping:
+                time_input = theano.gradient.grad_clip(
+                    time_input, -self.grad_clipping, self.grad_clipping)
+
+            # Reset and update gates
+            updategate = slice_w(hid_input, 0) + slice_w(input_n, 0) + time_input
+            updategate = self.nonlinearity_updategate(updategate)
+
+            # Compute W_{xc}x_t + s_t \odot (W_{hc} h_{t - 1})
+            hidden_update_in = slice_w(input_n, 1)
+            hidden_update_hid = slice_w(hid_input, 1)
+            hidden_update = hidden_update_in + time * hidden_update_hid
+            if self.grad_clipping:
+                hidden_update = theano.gradient.grad_clip(
+                    hidden_update, -self.grad_clipping, self.grad_clipping)
+            hidden_update = self.nonlinearity_hid(hidden_update)
+
+            # Compute (1 - u_t)h_{t - 1} + u_t c_t
+            hid = (1 - updategate) * hid_previous + updategate * hidden_update
+            # check dropout
+            if not deterministic and self.p:
+                hid = (hid / retain_prob) * dropout_mask
+            return [time, hid]
+
+        def step_masked(p_n, input_n, mask_n, time_previous, hid_previous, *args):
+            time, hid = step(p_n, input_n, time_previous, hid_previous, *args)
+
+            # Skip over any input with mask 0 by copying the previous
+            # hidden state; proceed normally for any input with mask 1.
+            time = T.switch(mask_n, time, time_previous)
+            hid = T.switch(mask_n, hid, hid_previous)
+
+            return [time, hid]
+
+        if mask is not None:
+            # mask is given as (batch_size, seq_len). Because scan iterates
+            # over first dimension, we dimshuffle to (seq_len, batch_size) and
+            # add a broadcastable dimension
+            mask = mask.dimshuffle(1, 0, 'x')
+            sequences = [self.P_time[:seq_len], input, mask]
+            step_fun = step_masked
+        else:
+            sequences = [self.P_time[:seq_len], input]
+            step_fun = step
+
+        if not isinstance(self.time_init, Layer):
+            # Dot against a 1s vector to repeat to shape (num_batch, num_units)
+            time_init = T.dot(T.ones((num_batch, 1)), self.time_init)
+
+        if not isinstance(self.hid_init, Layer):
+            # Dot against a 1s vector to repeat to shape (num_batch, num_units)
+            hid_init = T.dot(T.ones((num_batch, 1)), self.hid_init)
+
+        # The hidden-to-hidden weight matrix is always used in step
+        non_seqs = [W_hid_stacked, W_state_stacked]
+        # When we aren't precomputing the input outside of scan, we need to
+        # provide the input weights and biases to the step function
+        if not self.precompute_input:
+            non_seqs += [W_in_stacked, b_stacked]
+
+        if not deterministic and self.p:
+            one = T.constant(1)
+            retain_prob = one - self.p
+            time_init = (time_init / retain_prob) * dropout_mask
+            hid_init = (hid_init / retain_prob) * dropout_mask
+            non_seqs += [dropout_mask, retain_prob]
+
+        if self.unroll_scan:
+            # Retrieve the dimensionality of the incoming layer
+            input_shape = self.input_shapes[0]
+            # Explicitly unroll the recurrence instead of using scan
+            time_out, hid_out = unroll_scan(
+                fn=step_fun,
+                sequences=sequences,
+                outputs_info=[time_init, hid_init],
+                go_backwards=self.backwards,
+                non_sequences=non_seqs,
+                n_steps=input_shape[1])[0]
+        else:
+            # Scan op iterates over first dimension of input and repeatedly
+            # applies the step function
+            time_out, hid_out = theano.scan(
+                fn=step_fun,
+                sequences=sequences,
+                go_backwards=self.backwards,
+                outputs_info=[time_init, hid_init],
                 non_sequences=non_seqs,
                 truncate_gradient=self.gradient_steps,
                 strict=True)[0]
@@ -1398,13 +1811,13 @@ class MAXRULayer(MergeLayer):
         self.time_init_incoming_index = -1
         if mask_input is not None:
             incomings.append(mask_input)
-            self.mask_incoming_index = len(incomings)-1
+            self.mask_incoming_index = len(incomings) - 1
         if isinstance(hid_init, Layer):
             incomings.append(hid_init)
-            self.hid_init_incoming_index = len(incomings)-1
+            self.hid_init_incoming_index = len(incomings) - 1
         if isinstance(time_init, Layer):
             incomings.append(time_init)
-            self.time_init_incoming_index = len(incomings)-1
+            self.time_init_incoming_index = len(incomings) - 1
 
         # Initialize parent layer
         super(MAXRULayer, self).__init__(incomings, **kwargs)
@@ -1600,11 +2013,11 @@ class MAXRULayer(MergeLayer):
         # When theano.scan calls step, input_n will be (n_batch, 3*num_units).
         # We define a slicing function that extract the input to each GRU gate
         def slice_w(x, n):
-            return x[:, n*self.num_units:(n+1)*self.num_units]
+            return x[:, n * self.num_units:(n + 1) * self.num_units]
 
         def slice_w_time(x, n):
-            offset = 3*self.num_units
-            return x[:, (offset+n*self.num_time_units):(offset+(n+1)*self.num_time_units)]
+            offset = 3 * self.num_units
+            return x[:, (offset + n * self.num_time_units):(offset + (n + 1) * self.num_time_units)]
 
         # Create single recurrent computation step function
         # input__n is the n'th vector of the input
@@ -1622,7 +2035,7 @@ class MAXRULayer(MergeLayer):
                 # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
                 input_n = T.dot(input_n, W_in_stacked) + b_stacked
 
-            #time update gates
+            # time update gates
             time_updategate = slice_w_time(hid_input, 0) + slice_w_time(input_n, 0)
             time_update = slice_w_time(hid_input, 1) + slice_w_time(input_n, 1)
             time_updategate = self.nonlinearity_time_updategate(time_updategate)
@@ -1631,6 +2044,8 @@ class MAXRULayer(MergeLayer):
             # compute time_state
             time = (1 - time_updategate) * time_previous + time_updategate * time_update
             time = time * (self.nonlinearity(p_n))
+            if not deterministic and self.p:
+                time = (time / retain_prob) * dropout_mask_time
 
             time_input = T.dot(time, W_state_stacked)
 
@@ -1647,17 +2062,16 @@ class MAXRULayer(MergeLayer):
             # Compute W_{xc}x_t + r_t \odot (W_{hc} h_{t - 1})
             hidden_update_in = slice_w(input_n, 2)
             hidden_update_hid = slice_w(hid_input, 2)
-            hidden_update = hidden_update_in + resetgate*hidden_update_hid
+            hidden_update = hidden_update_in + resetgate * hidden_update_hid
             if self.grad_clipping:
                 hidden_update = theano.gradient.grad_clip(
                     hidden_update, -self.grad_clipping, self.grad_clipping)
             hidden_update = self.nonlinearity_hid(hidden_update)
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
-            hid = (1 - updategate)*hid_previous + updategate*hidden_update
+            hid = (1 - updategate) * hid_previous + updategate * hidden_update
             # check dropout
             if not deterministic and self.p:
-                time = (time / retain_prob) * dropout_mask_time
                 hid = (hid / retain_prob) * dropout_mask_hidden
             return [time, hid]
 
