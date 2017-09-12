@@ -73,7 +73,7 @@ def build_RNN(architec, layer_input, layer_mask, num_units, num_time_units, max_
 
         return MAXRULayer(layer_input, num_units, num_time_units=num_time_units, max_length=max_length,
                           mask_input=layer_mask, grad_clipping=grad_clipping,
-                          P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
+                          P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.sigmoid,
                           resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
                           time_updategate=time_updategate, time_update=time_update,
                           only_return_final=True, name='MAXRU', p=0.)
