@@ -1295,7 +1295,7 @@ class GRULayer(MergeLayer):
         return hid_out
 
 
-class MAXRU_AALayer(MergeLayer):
+class MAXRULayer_AA(MergeLayer):
     """
     MAXRULayer based on lasagne.layer.GRULayer, with recurrent dropout options.
 
@@ -1366,7 +1366,7 @@ class MAXRU_AALayer(MergeLayer):
     def __init__(self, incoming, num_units, max_length=100,
                  P_time=init.Constant(0.),
                  nonlinearity=nonlinearities.tanh,
-                 updategate=Gate(),
+                 updategate=Gate(W_cell=None),
                  hidden_update=Gate(W_cell=None, nonlinearity=nonlinearities.tanh),
                  time_updategate=Gate(W_cell=None),
                  time_update=Gate(W_cell=None, nonlinearity=nonlinearities.tanh),
@@ -1402,7 +1402,7 @@ class MAXRU_AALayer(MergeLayer):
             self.time_init_incoming_index = len(incomings) - 1
 
         # Initialize parent layer
-        super(MAXRU_AALayer, self).__init__(incomings, **kwargs)
+        super(MAXRULayer_AA, self).__init__(incomings, **kwargs)
 
         self.learn_init = learn_init
         self.num_units = num_units
@@ -1454,9 +1454,6 @@ class MAXRU_AALayer(MergeLayer):
 
         (self.W_in_to_hidden_update, self.W_hid_to_hidden_update, self.b_hidden_update,
          self.nonlinearity_hid) = add_gate_params(hidden_update, 'hidden_update')
-
-        self.W_state_to_updategate = self.add_param(updategate.W_cell, (num_units, num_units),
-                                                    name="W_state_to_updategate")
 
         self.P_time = self.add_param(P_time, (max_length, num_units), name="P_time")
         # If the provided nonlinearity is None, make it linear
@@ -1559,8 +1556,6 @@ class MAXRU_AALayer(MergeLayer):
         b_stacked = T.concatenate([self.b_updategate, self.b_hidden_update,
                                    self.b_to_time_updategate, self.b_to_time_update], axis=0)
 
-        W_state_stacked = self.W_state_to_updategate
-
         if self.precompute_input:
             # precompute_input inputs*W. W_in is (n_features, 3*num_units).
             # input is then (n_batch, n_time_steps, 3*num_units).
@@ -1593,22 +1588,16 @@ class MAXRU_AALayer(MergeLayer):
             time_updategate = self.nonlinearity_time_updategate(time_updategate)
             time_update = self.nonlinearity_time_update(time_update)
 
-            # compute time_state
+            # compute time state
             time = (1 - time_updategate) * time_previous + time_updategate * time_update
             time = time * (self.nonlinearity(p_n))
-            # check dropout
-            if not deterministic and self.p:
-                time = (time / retain_prob) * dropout_mask
-
-            time_input = T.dot(time, W_state_stacked)
 
             if self.grad_clipping:
-                time_input = theano.gradient.grad_clip(
-                    time_input, -self.grad_clipping, self.grad_clipping)
+                time = theano.gradient.grad_clip(time, -self.grad_clipping, self.grad_clipping)
 
-            # Reset and update gates
-            updategate = slice_w(hid_input, 0) + slice_w(input_n, 0) + time_input
-            updategate = self.nonlinearity_updategate(updategate)
+            # update gates
+            updategate = slice_w(hid_input, 0) + slice_w(input_n, 0)
+            updategate = self.nonlinearity_updategate(updategate) * time
 
             # Compute W_{xc}x_t + s_t \odot (W_{hc} h_{t - 1})
             hidden_update_in = slice_w(input_n, 1)
@@ -1620,7 +1609,7 @@ class MAXRU_AALayer(MergeLayer):
             hidden_update = self.nonlinearity_hid(hidden_update)
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
-            hid = (1 - updategate) * hid_previous + updategate * hidden_update
+            hid = updategate * hid_previous + (1 - updategate) * hidden_update
             # check dropout
             if not deterministic and self.p:
                 hid = (hid / retain_prob) * dropout_mask
@@ -1656,7 +1645,7 @@ class MAXRU_AALayer(MergeLayer):
             hid_init = T.dot(T.ones((num_batch, 1)), self.hid_init)
 
         # The hidden-to-hidden weight matrix is always used in step
-        non_seqs = [W_hid_stacked, W_state_stacked]
+        non_seqs = [W_hid_stacked]
         # When we aren't precomputing the input outside of scan, we need to
         # provide the input weights and biases to the step function
         if not self.precompute_input:

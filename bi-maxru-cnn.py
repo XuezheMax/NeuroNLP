@@ -280,7 +280,7 @@ def main():
     output_predict = args.output_prediction
     dropout = args.dropout
     p = 0.5
-    max_length = 150
+    max_length = 120
 
     logger.info("Creating Alphabets")
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
@@ -467,7 +467,7 @@ def main():
 
         if epoch in schedule:
             lr = lr * decay_rate
-            updates = nesterov_momentum(loss_train, params=params, learning_rate=lr, momentum=momentum)
+            updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
             train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
                                        [loss_train, corr_train, corr_nr_train, num_tokens, num_tokens_nr],
                                        updates=updates)
