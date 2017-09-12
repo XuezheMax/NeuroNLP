@@ -14,9 +14,7 @@ import theano
 import theano.tensor as T
 from lasagne.layers import Gate, LSTMLayer, GRULayer
 from lasagne import nonlinearities
-from lasagne.updates import nesterov_momentum, adam
 
-from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
 from neuronlp.layers.recurrent import MAXRULayer
 
@@ -189,7 +187,7 @@ def main():
     schedule = args.schedule
     grad_clipping = args.grad_clipping
     max_length = 60
-    logger = get_logger("Sequence Labeling (%s)" % (architec))
+    logger = get_logger("Sentiment Classification (%s)" % (architec))
 
     def read_dataset(filename):
         data = [[] for _ in _buckets]
