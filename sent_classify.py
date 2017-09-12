@@ -382,7 +382,7 @@ def main():
         if epoch in schedule:
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
-            train_fn = theano.function([word_var, target_var, mask_var], [loss_train, corr_train],
+            train_fn = theano.function([word_var, target_var, mask_var, position_var], [loss_train, corr_train],
                                        updates=updates, on_unused_input='ignore')
 
 
