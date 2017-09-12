@@ -14,7 +14,9 @@ import theano
 import theano.tensor as T
 from lasagne.layers import Gate, LSTMLayer, GRULayer
 from lasagne import nonlinearities
+from lasagne.updates import adam
 
+from neuronlp.io import get_logger
 from neuronlp import utils
 from neuronlp.layers.recurrent import MAXRULayer
 
