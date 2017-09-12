@@ -73,7 +73,7 @@ def build_RNN(architec, layer_input, layer_mask, num_units, num_time_units, max_
 
         return MAXRULayer(layer_input, num_units, num_time_units=num_time_units, max_length=max_length,
                           mask_input=layer_mask, grad_clipping=grad_clipping,
-                          P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.sigmoid,
+                          P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
                           resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
                           time_updategate=time_updategate, time_update=time_update,
                           only_return_final=True, name='MAXRU', p=0.)
@@ -295,9 +295,11 @@ def main():
     updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, target_var, mask_var], [loss_train, corr_train], updates=updates)
+    train_fn = theano.function([word_var, target_var, mask_var, position_var],
+                               [loss_train, corr_train], updates=updates, on_unused_input='ignore')
     # Compile a second function evaluating the loss and accuracy of network
-    eval_fn = theano.function([word_var, target_var, mask_var], [corr_eval, final_prediction])
+    eval_fn = theano.function([word_var, target_var, mask_var, position_var],
+                              [corr_eval, final_prediction], on_unused_input='ignore')
 
     # Finally, launch the training loop.
     logger.info("%s: (#data: %d, batch size: %d, clip: %.1f)..." % (architec, num_data_train, batch_size, grad_clipping))
@@ -318,7 +320,9 @@ def main():
         for batch in xrange(1, num_batches + 1):
             wids, tids, masks = get_batch(data_train, batch_size)
             num = wids.shape[0]
-            err, corr = train_fn(wids, tids, masks)
+            length = wids.shape[1]
+            poss = np.zeros_like(wids, dtype=np.int32) + np.arange(length, dtype=np.int32)
+            err, corr = train_fn(wids, tids, masks, poss)
             train_err += err * num
             train_corr += corr
             train_total += num
@@ -343,7 +347,9 @@ def main():
         for batch in iterate_batch(data_dev, batch_size):
             wids, tids, masks = batch
             num = wids.shape[0]
-            corr, predictions = eval_fn(wids, tids, masks)
+            length = wids.shape[1]
+            poss = np.zeros_like(wids, dtype=np.int32) + np.arange(length, dtype=np.int32)
+            corr, predictions = eval_fn(wids, tids, masks, poss)
             dev_corr += corr
             dev_total += num
 
@@ -360,7 +366,9 @@ def main():
             for batch in iterate_batch(data_test, batch_size):
                 wids, tids, masks = batch
                 num = wids.shape[0]
-                corr, predictions = eval_fn(wids, tids, masks)
+                length = wids.shape[1]
+                poss = np.zeros_like(wids, dtype=np.int32) + np.arange(length, dtype=np.int32)
+                corr, predictions = eval_fn(wids, tids, masks, poss)
                 test_corr += corr
                 test_total += num
 
@@ -374,7 +382,8 @@ def main():
         if epoch in schedule:
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
-            train_fn = theano.function([word_var, target_var, mask_var], [loss_train, corr_train], updates=updates)
+            train_fn = theano.function([word_var, target_var, mask_var], [loss_train, corr_train],
+                                       updates=updates, on_unused_input='ignore')
 
 
 if __name__ == '__main__':
