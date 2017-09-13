@@ -49,7 +49,7 @@ def build_std_dropout(incoming1, incoming2, num_units, num_labels, mask, grad_cl
     incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
 
     # dropout for incoming
-    incoming = lasagne.layers.DropoutLayer(incoming, p=p)
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2)
 
     ingate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                           W_cell=lasagne.init.Uniform(range=0.1))
@@ -117,7 +117,7 @@ def build_recur_dropout(incoming1, incoming2, num_units, num_labels, mask, grad_
     incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
 
     # dropout for incoming
-    incoming = lasagne.layers.DropoutLayer(incoming, p=p, shared_axes=(1,))
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2, shared_axes=(1,))
 
     ingate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                           W_cell=lasagne.init.Uniform(range=0.1))
@@ -262,7 +262,7 @@ def main():
     schedule = args.schedule
     output_predict = args.output_prediction
     dropout = args.dropout
-    p = 0.5
+    p = 0.33
 
     logger.info("Creating Alphabets")
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",

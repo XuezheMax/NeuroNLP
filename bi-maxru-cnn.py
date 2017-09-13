@@ -50,7 +50,7 @@ def build_std_dropout(incoming1, incoming2, num_units, num_time_units, max_lengt
     incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
 
     # dropout for incoming
-    incoming = lasagne.layers.DropoutLayer(incoming, p=p)
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2)
 
     time_updategate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
     time_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
@@ -126,7 +126,7 @@ def build_recur_dropout(incoming1, incoming2, num_units, num_time_units, max_len
     incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
 
     # dropout for incoming
-    incoming = lasagne.layers.DropoutLayer(incoming, p=p, shared_axes=(1,))
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2, shared_axes=(1,))
 
     time_updategate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
     time_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
@@ -279,7 +279,7 @@ def main():
     schedule = args.schedule
     output_predict = args.output_prediction
     dropout = args.dropout
-    p = 0.5
+    p = 0.33
     max_length = 150
 
     logger.info("Creating Alphabets")
