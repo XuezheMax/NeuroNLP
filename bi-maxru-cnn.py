@@ -280,7 +280,7 @@ def main():
     output_predict = args.output_prediction
     dropout = args.dropout
     p = 0.5
-    max_length = 120
+    max_length = 150
 
     logger.info("Creating Alphabets")
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
