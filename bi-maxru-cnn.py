@@ -279,7 +279,7 @@ def main():
     schedule = args.schedule
     output_predict = args.output_prediction
     dropout = args.dropout
-    p = 0.33
+    p = 0.5
     max_length = 150
 
     logger.info("Creating Alphabets")
