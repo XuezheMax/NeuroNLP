@@ -1631,8 +1631,6 @@ class MAXRULayer(MergeLayer):
             # compute time_state
             time = (1 - time_updategate) * time_previous_dropped + time_updategate * time_update
             time = time * (self.nonlinearity(p_n))
-            if not deterministic and self.p:
-                time = (time / retain_prob) * dropout_mask_time
 
             time_input = T.dot(time, W_state_stacked)
 
@@ -1657,9 +1655,6 @@ class MAXRULayer(MergeLayer):
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
             hid = (1 - updategate) * hid_previous_dropped + updategate * hidden_update
-            # check dropout
-            if not deterministic and self.p:
-                hid = (hid / retain_prob) * dropout_mask_hidden
             return [time, hid]
 
         def step_masked(p_n, input_n, mask_n, time_previous, hid_previous, *args):
