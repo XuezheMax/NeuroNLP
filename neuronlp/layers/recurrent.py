@@ -1522,12 +1522,15 @@ class SGRULayer(MergeLayer):
         if self.precompute_input:
             # precompute_input inputs*W. W_in is (n_features, 4*num_units).
             # input is then (n_batch, n_time_steps, 4*num_units).
-            input = T.dot(input, W_in_stacked) + b_stacked
+            input = T.dot(input, W_in_stacked)
 
-        # When theano.scan calls step, input_n will be (n_batch, 3*num_units).
+        # When theano.scan calls step, input_n will be (n_batch, 4*num_units).
         # We define a slicing function that extract the input to each GRU gate
         def slice_w(x, n):
             return x[:, n * self.num_units:(n + 1) * self.num_units]
+
+        def slice_b(x, n):
+            return x[n * self.num_units:(n + 1) * self.num_units]
 
         # Create single recurrent computation step function
         # input__n is the n'th vector of the input
@@ -1547,20 +1550,20 @@ class SGRULayer(MergeLayer):
 
             if not self.precompute_input:
                 # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
-                input_n = T.dot(input_n, W_in_stacked) + b_stacked
+                input_n = T.dot(input_n, W_in_stacked)
 
             # Reset and update gates
-            resetgate_input = slice_w(hid_input, 0) + slice_w(input_n, 0)
-            resetgate_hidden = slice_w(hid_input, 1) + slice_w(input_n, 1)
-            updategate = slice_w(hid_input, 2) + slice_w(input_n, 2)
+            resetgate_input = slice_w(hid_input, 0) + slice_w(input_n, 0) + slice_b(b_stacked, 0)
+            resetgate_hidden = slice_w(hid_input, 1) + slice_w(input_n, 1) + slice_b(b_stacked, 1)
+            updategate = slice_w(hid_input, 2) + slice_w(input_n, 2) + slice_b(b_stacked, 2)
             resetgate_input = self.nonlinearity_resetgate_input(resetgate_input)
             resetgate_hidden = self.nonlinearity_resetgate_hidden(resetgate_hidden)
             updategate = self.nonlinearity_updategate(updategate)
 
             # Compute i_t \odot (W_{xc}x_t) + r_t \odot (W_{hc} h_{t - 1})
-            hidden_update_in = slice_w(input_n, 3) - self.b_hidden_update
+            hidden_update_in = slice_w(input_n, 3)
             hidden_update_hid = slice_w(hid_input, 3)
-            hidden_update = resetgate_input * hidden_update_in + resetgate_hidden * hidden_update_hid + self.b_hidden_update
+            hidden_update = resetgate_input * hidden_update_in + resetgate_hidden * hidden_update_hid + slice_b(b_stacked, 3)
             if self.grad_clipping:
                 hidden_update = theano.gradient.grad_clip(
                     hidden_update, -self.grad_clipping, self.grad_clipping)
@@ -1595,11 +1598,11 @@ class SGRULayer(MergeLayer):
             hid_init = T.dot(T.ones((num_batch, 1)), self.hid_init)
 
         # The hidden-to-hidden weight matrix is always used in step
-        non_seqs = [W_hid_stacked, self.b_hidden_update]
+        non_seqs = [W_hid_stacked, b_stacked]
         # When we aren't precomputing the input outside of scan, we need to
         # provide the input weights and biases to the step function
         if not self.precompute_input:
-            non_seqs += [W_in_stacked, b_stacked]
+            non_seqs += [W_in_stacked]
 
         if not deterministic and self.p:
             one = T.constant(1)

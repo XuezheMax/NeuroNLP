@@ -94,13 +94,13 @@ def exe_maxru(length, num_units, position, binominal):
                             time_updategate=time_updategate, time_update=time_update,
                             only_return_final=True, name='MAXRU', p=0.)
 
-    W = layer_taru.W_hid_to_hidden_update.sum()
-    U = layer_taru.W_in_to_hidden_update.sum()
-    b = layer_taru.b_hidden_update.sum()
+    # W = layer_taru.W_hid_to_hidden_update.sum()
+    # U = layer_taru.W_in_to_hidden_update.sum()
+    # b = layer_taru.b_hidden_update.sum()
 
     layer_output = DenseLayer(layer_taru, num_units=1, nonlinearity=nonlinearities.sigmoid, name='output')
 
-    return train(layer_output, input_var, target_var, W, U, b, batch_size, length, position, binominal)
+    return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
 
 
 def main():
