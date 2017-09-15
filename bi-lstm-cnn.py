@@ -262,7 +262,7 @@ def main():
     schedule = args.schedule
     output_predict = args.output_prediction
     dropout = args.dropout
-    p = 0.5
+    p = 0.33
 
     logger.info("Creating Alphabets")
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
