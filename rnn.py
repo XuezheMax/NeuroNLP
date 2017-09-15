@@ -8,8 +8,8 @@ import theano
 import lasagne
 
 import lasagne.nonlinearities as nonlinearities
-from lasagne.layers import RecurrentLayer, Gate, LSTMLayer, GRULayer, DenseLayer
-from neuronlp.layers import SGRULayer
+from lasagne.layers import RecurrentLayer, Gate, LSTMLayer, DenseLayer
+from neuronlp.layers import SGRULayer, GRULayer
 
 BATCH_SIZE = 128
 
@@ -130,7 +130,7 @@ def exe_lstm(use_embedd, length, num_units, position, binominal):
 
     return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
 
-def exe_gru(use_embedd, length, num_units, position, binominal):
+def exe_gru(use_embedd, length, num_units, position, binominal, reset_input):
     batch_size = BATCH_SIZE
 
     input_var = T.tensor3(name='inputs', dtype=theano.config.floatX)
@@ -149,7 +149,7 @@ def exe_gru(use_embedd, length, num_units, position, binominal):
                         b=lasagne.init.Constant(0.), nonlinearity=nonlinearities.tanh)
 
     layer_gru = GRULayer(layer_input, num_units, resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
-                         only_return_final=True, name='GRU')
+                         reset_input=reset_input, only_return_final=True, name='GRU')
 
     # W = layer_gru.W_hid_to_hidden_update.sum()
     # U = layer_gru.W_in_to_hidden_update.sum()
@@ -158,6 +158,14 @@ def exe_gru(use_embedd, length, num_units, position, binominal):
     layer_output = DenseLayer(layer_gru, num_units=1, nonlinearity=nonlinearities.sigmoid, name='output')
 
     return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
+
+
+def exe_gru0(use_embedd, length, num_units, position, binominal):
+    return exe_gru(use_embedd, length, num_units, position, binominal, False)
+
+
+def exe_gru1(use_embedd, length, num_units, position, binominal):
+    return exe_gru(use_embedd, length, num_units, position, binominal, True)
 
 
 def exe_sgru(use_embedd, length, num_units, position, binominal):
@@ -194,7 +202,7 @@ def exe_sgru(use_embedd, length, num_units, position, binominal):
 
 def main():
     parser = argparse.ArgumentParser(description='Tuning with bi-directional RNN')
-    parser.add_argument('--architec', choices=['rnn', 'lstm', 'gru', 'sgru'], help='architecture of rnn', required=True)
+    parser.add_argument('--architec', choices=['rnn', 'lstm', 'gru0', 'gru1', 'sgru'], help='architecture of rnn', required=True)
     parser.add_argument('--num_units', type=int, default=2, help='Number of units')
     parser.add_argument('--use_embedd', action='store_true', help='If use positional embedding')
     parser.add_argument('--binominal', action='store_true', help='If the data are sampled from bi-nominal distribution.')
@@ -209,8 +217,10 @@ def main():
         exe = exe_rnn
     elif architec == 'lstm':
         exe = exe_lstm
-    elif architec == 'gru':
-        exe = exe_gru
+    elif architec == 'gru0':
+        exe = exe_gru0
+    elif architec == 'gru1':
+        exe = exe_gru1
     elif architec == 'sgru':
         exe = exe_sgru
     else:
