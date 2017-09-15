@@ -25,7 +25,7 @@ def get_batch(batch_size, pos, binominal, length):
     return np.reshape(x, [batch_size, length, 1]).astype(np.float32), y
 
 
-def train(layer_output, input_var, target_var, W, U, b, batch_size, length, position, binominal):
+def train(layer_output, input_var, target_var, batch_size, length, position, binominal):
     predictions = lasagne.layers.get_output(layer_output)
     acc = lasagne.objectives.binary_accuracy(predictions, target_var)
     acc = acc.sum()
@@ -38,7 +38,7 @@ def train(layer_output, input_var, target_var, W, U, b, batch_size, length, posi
     params = lasagne.layers.get_all_params(layer_output, trainable=True)
     # updates = lasagne.updates.sgd(loss, params=params, learning_rate=learning_rate)
     updates = lasagne.updates.adam(loss, params=params, learning_rate=learning_rate)
-    train_fn = theano.function([input_var, target_var], [loss, acc, W, U, b, predictions], updates=updates)
+    train_fn = theano.function([input_var, target_var], [loss, acc, predictions], updates=updates)
 
     num_epoches = 500
     accuracies = np.zeros(num_epoches)
@@ -50,22 +50,14 @@ def train(layer_output, input_var, target_var, W, U, b, batch_size, length, posi
         num_back = 0
         for step in xrange(steps_per_epoch):
             x, y = get_batch(batch_size, position, binominal, length)
-            err, corr, w, u, b, pred = train_fn(x, y)
+            err, corr, pred = train_fn(x, y)
             # print x
             # print y
             # print pred
             loss += err
             correct += corr
             num_inst = (step + 1) * batch_size
-        # # update log
-        #     sys.stdout.write("\b" * num_back)
-        #     log_info = 'inst: %d loss: %.4f, corr: %d, acc: %.2f%%, W: %.6f, U: %.6f, b: %.6f' % (
-        #         num_inst, loss / num_inst, correct, correct * 100 / num_inst, w, u, b)
-        #     sys.stdout.write(log_info)
-        #     num_back = len(log_info)
-        #     # raw_input()
-        # # update training log after each epoch
-        # sys.stdout.write("\b" * num_back)
+
         assert num_inst == batch_size * steps_per_epoch
         accuracies[epoch] = correct * 100 / num_inst
         print 'inst: %d loss: %.4f, corr: %d, acc: %.2f%%, time: %.2fs' % (
