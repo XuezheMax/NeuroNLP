@@ -1921,10 +1921,8 @@ class MAXRULayer(MergeLayer):
         if not deterministic and self.p:
             one = T.constant(1)
             retain_prob = one - self.p
-            dropout_mask_hidden_shape = (num_batch, self.num_units)
-            dropout_mask_hidden = self._srng.binomial(dropout_mask_hidden_shape, p=retain_prob, dtype=input.dtype)
-            dropout_mask_time_shape = (num_batch, self.num_time_units)
-            dropout_mask_time = self._srng.binomial(dropout_mask_time_shape, p=retain_prob, dtype=input.dtype)
+            dropout_mask_shape = (num_batch, self.num_units)
+            dropout_mask = self._srng.binomial(dropout_mask_shape, p=retain_prob, dtype=input.dtype)
 
         # Stack input weight matrices into a (num_inputs, 3*num_units)
         # matrix, which speeds up computation
@@ -1963,10 +1961,8 @@ class MAXRULayer(MergeLayer):
         # input__n is the n'th vector of the input
         def step(p_n, input_n, time_previous, hid_previous, *args):
             hid_previous_dropped = hid_previous
-            time_previous_dropped = time_previous
             if not deterministic and self.p:
-                hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask_hidden
-                time_previous_dropped = (time_previous / retain_prob) * dropout_mask_time
+                hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask
 
             # Compute W_{hr} h_{t - 1}, W_{hu} h_{t - 1}, and W_{hc} h_{t - 1}
             hid_input = T.dot(hid_previous_dropped, W_hid_stacked)
@@ -1988,7 +1984,7 @@ class MAXRULayer(MergeLayer):
             time_update = self.nonlinearity_time_update(time_update)
 
             # compute time_state
-            time = (1 - time_updategate) * time_previous_dropped + time_updategate * time_update
+            time = (1 - time_updategate) * time_previous + time_updategate * time_update
             time = time * (self.nonlinearity(p_n))
 
             time_input = T.dot(time, W_state_stacked)
@@ -2055,7 +2051,7 @@ class MAXRULayer(MergeLayer):
         if not deterministic and self.p:
             one = T.constant(1)
             retain_prob = one - self.p
-            non_seqs += [dropout_mask_time, dropout_mask_hidden, retain_prob]
+            non_seqs += [dropout_mask, retain_prob]
 
         if self.unroll_scan:
             # Retrieve the dimensionality of the incoming layer
