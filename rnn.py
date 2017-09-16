@@ -232,7 +232,7 @@ def main():
     num_runs = 50
     for length in [5, 10, 20, 40, 50]:
         result = 0.
-        position = 2
+        position = 0
         print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (architec, NUM_UNITS, length, position, USE_EMBEDD)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
