@@ -8,8 +8,8 @@ import theano
 import lasagne
 
 import lasagne.nonlinearities as nonlinearities
-from lasagne.layers import RecurrentLayer, Gate, LSTMLayer, DenseLayer
-from neuronlp.layers import SGRULayer, GRULayer
+from lasagne.layers import RecurrentLayer, Gate, DenseLayer
+from neuronlp.layers import SGRULayer, GRULayer, LSTMLayer
 
 BATCH_SIZE = 128
 
@@ -232,7 +232,7 @@ def main():
     num_runs = 50
     for length in [5, 10, 20, 40, 50]:
         result = 0.
-        position = 0
+        position = 2
         print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (architec, NUM_UNITS, length, position, USE_EMBEDD)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
