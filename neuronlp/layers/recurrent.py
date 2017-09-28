@@ -1261,8 +1261,8 @@ class GRULayer(MergeLayer):
             # Dot against a 1s vector to repeat to shape (num_batch, num_units)
             hid_init = T.dot(T.ones((num_batch, 1)), self.hid_init)
 
-        reset_init = T.zeros((num_batch, 1), dtype=theano.config.floatX)
-        update_init = T.zeros((num_batch, 1), dtype=theano.config.floatX)
+        reset_init = T.zeros((num_batch, self.num_units), dtype=theano.config.floatX)
+        update_init = T.zeros((num_batch, self.num_units), dtype=theano.config.floatX)
 
         # The hidden-to-hidden weight matrix is always used in step
         non_seqs = [W_hid_stacked, b_stacked]
