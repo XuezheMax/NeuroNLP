@@ -1092,6 +1092,9 @@ class GRULayer(MergeLayer):
                 hid_init, (1, self.num_units), name="hid_init",
                 trainable=learn_init, regularizable=False)
 
+        # self.r = self.add_param(T.zeros((input_shape[0], input_shape[1], 1), dtype=theano.config.floatX), (input_shape[0], input_shape[1], 1), name='rs')
+        # self.z = self.add_param(T.zeros((input_shape[0], input_shape[1], 1), dtype=theano.config.floatX), (input_shape[0], input_shape[1], 1), name='rs')
+
     def get_output_shape_for(self, input_shapes):
         # The shape of the input to this layer will be the first element
         # of input_shapes, whether or not a mask input is being used.
@@ -1174,7 +1177,7 @@ class GRULayer(MergeLayer):
         if self.precompute_input:
             # precompute_input inputs*W. W_in is (n_features, 3*num_units).
             # input is then (n_batch, n_time_steps, 3*num_units).
-            input = T.dot(input, W_in_stacked) + b_stacked
+            input = T.dot(input, W_in_stacked)
 
         # When theano.scan calls step, input_n will be (n_batch, 3*num_units).
         # We define a slicing function that extract the input to each GRU gate
@@ -1184,9 +1187,15 @@ class GRULayer(MergeLayer):
                 s = T.addbroadcast(s, 1)  # Theano cannot infer this by itself
             return s
 
+        def slice_b(x, n):
+            s = x[n * self.num_units:(n + 1) * self.num_units]
+            if self.num_units == 1:
+                s = T.addbroadcast(s, 0)  # Theano cannot infer this by itself
+            return s
+
         # Create single recurrent computation step function
         # input__n is the n'th vector of the input
-        def step(input_n, hid_previous, *args):
+        def step(input_n, hid_previous, reset_previous, update_previous, *args):
             hid_previous_dropped = hid_previous
             if not deterministic and self.p:
                 hid_previous_dropped = (hid_previous / retain_prob) * dropout_mask
@@ -1202,21 +1211,22 @@ class GRULayer(MergeLayer):
 
             if not self.precompute_input:
                 # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
-                input_n = T.dot(input_n, W_in_stacked) + b_stacked
+                input_n = T.dot(input_n, W_in_stacked)
 
             # Reset and update gates
-            resetgate = slice_w(hid_input, 0) + slice_w(input_n, 0)
-            updategate = slice_w(hid_input, 1) + slice_w(input_n, 1)
+            resetgate = slice_w(hid_input, 0) + slice_w(input_n, 0) + slice_b(b_stacked, 0)
+            updategate = slice_w(hid_input, 1) + slice_w(input_n, 1) + slice_b(b_stacked, 1)
             resetgate = self.nonlinearity_resetgate(resetgate)
             updategate = self.nonlinearity_updategate(updategate)
 
             # Compute W_{xc}x_t + r_t \odot (W_{hc} h_{t - 1})
             hidden_update_in = slice_w(input_n, 2)
             hidden_update_hid = slice_w(hid_input, 2)
+            hidden_update_bias = slice_b(b_stacked, 2)
             if self.reset_input:
-                hidden_update = (1 - resetgate) * hidden_update_in + resetgate * hidden_update_hid
+                hidden_update = (1 - resetgate) * hidden_update_in + resetgate * hidden_update_hid + hidden_update_bias
             else:
-                hidden_update = hidden_update_in + resetgate * hidden_update_hid
+                hidden_update = hidden_update_in + resetgate * hidden_update_hid + hidden_update_bias
 
             if self.grad_clipping:
                 hidden_update = theano.gradient.grad_clip(
@@ -1225,10 +1235,10 @@ class GRULayer(MergeLayer):
 
             # Compute (1 - u_t)h_{t - 1} + u_t c_t
             hid = (1 - updategate) * hid_previous_dropped + updategate * hidden_update
-            return hid
+            return hid, resetgate, updategate
 
-        def step_masked(input_n, mask_n, hid_previous, *args):
-            hid = step(input_n, hid_previous, *args)
+        def step_masked(input_n, mask_n, hid_previous, reset_previous, update_previous, *args):
+            hid = step(input_n, hid_previous, reset_previous, update_previous, *args)
 
             # Skip over any input with mask 0 by copying the previous
             # hidden state; proceed normally for any input with mask 1.
@@ -1251,12 +1261,15 @@ class GRULayer(MergeLayer):
             # Dot against a 1s vector to repeat to shape (num_batch, num_units)
             hid_init = T.dot(T.ones((num_batch, 1)), self.hid_init)
 
+        reset_init = T.zeros((num_batch, 1), dtype=theano.config.floatX)
+        update_init = T.zeros((num_batch, 1), dtype=theano.config.floatX)
+
         # The hidden-to-hidden weight matrix is always used in step
-        non_seqs = [W_hid_stacked]
+        non_seqs = [W_hid_stacked, b_stacked]
         # When we aren't precomputing the input outside of scan, we need to
         # provide the input weights and biases to the step function
         if not self.precompute_input:
-            non_seqs += [W_in_stacked, b_stacked]
+            non_seqs += [W_in_stacked]
 
         if not deterministic and self.p:
             one = T.constant(1)
@@ -1267,24 +1280,27 @@ class GRULayer(MergeLayer):
             # Retrieve the dimensionality of the incoming layer
             input_shape = self.input_shapes[0]
             # Explicitly unroll the recurrence instead of using scan
-            hid_out = unroll_scan(
+            hid_out, reset_out, update_out = unroll_scan(
                 fn=step_fun,
                 sequences=sequences,
-                outputs_info=[hid_init],
+                outputs_info=[hid_init, reset_init, update_init],
                 go_backwards=self.backwards,
                 non_sequences=non_seqs,
                 n_steps=input_shape[1])[0]
         else:
             # Scan op iterates over first dimension of input and repeatedly
             # applies the step function
-            hid_out = theano.scan(
+            hid_out, reset_out, update_out = theano.scan(
                 fn=step_fun,
                 sequences=sequences,
                 go_backwards=self.backwards,
-                outputs_info=[hid_init],
+                outputs_info=[hid_init, reset_init, update_init],
                 non_sequences=non_seqs,
                 truncate_gradient=self.gradient_steps,
                 strict=True)[0]
+
+        self.r = reset_out
+        self.z = update_out
 
         # When it is requested that we only return the final sequence step,
         # we need to slice it out immediately after scan is applied
@@ -1299,6 +1315,10 @@ class GRULayer(MergeLayer):
                 hid_out = hid_out[:, ::-1]
 
         return hid_out
+
+
+    def get_gates(self):
+        return self.r, self.z
 
 
 class SGRULayer(MergeLayer):
@@ -1534,7 +1554,7 @@ class SGRULayer(MergeLayer):
         if self.precompute_input:
             # precompute_input inputs*W. W_in is (n_features, 4*num_units).
             # input is then (n_batch, n_time_steps, 4*num_units).
-            input = T.dot(input, W_in_stacked) + b_stacked
+            input = T.dot(input, W_in_stacked)
 
         # When theano.scan calls step, input_n will be (n_batch, 4*num_units).
         # We define a slicing function that extract the input to each GRU gate
@@ -1542,6 +1562,12 @@ class SGRULayer(MergeLayer):
             s = x[:, n * self.num_units:(n + 1) * self.num_units]
             if self.num_units == 1:
                 s = T.addbroadcast(s, 1)  # Theano cannot infer this by itself
+            return s
+
+        def slice_b(x, n):
+            s = x[n * self.num_units:(n + 1) * self.num_units]
+            if self.num_units == 1:
+                s = T.addbroadcast(s, 0)  # Theano cannot infer this by itself
             return s
 
         # Create single recurrent computation step function
@@ -1562,12 +1588,12 @@ class SGRULayer(MergeLayer):
 
             if not self.precompute_input:
                 # Compute W_{xr}x_t + b_r, W_{xu}x_t + b_u, and W_{xc}x_t + b_c
-                input_n = T.dot(input_n, W_in_stacked) + b_stacked
+                input_n = T.dot(input_n, W_in_stacked)
 
             # Reset and update gates
-            resetgate_input = slice_w(hid_input, 0) + slice_w(input_n, 0)
-            resetgate_hidden = slice_w(hid_input, 1) + slice_w(input_n, 1)
-            updategate = slice_w(hid_input, 2) + slice_w(input_n, 2)
+            resetgate_input = slice_w(hid_input, 0) + slice_w(input_n, 0) + slice_b(b_stacked, 0)
+            resetgate_hidden = slice_w(hid_input, 1) + slice_w(input_n, 1) + slice_b(b_stacked, 1)
+            updategate = slice_w(hid_input, 2) + slice_w(input_n, 2) + slice_b(b_stacked, 2)
             resetgate_input = self.nonlinearity_resetgate_input(resetgate_input)
             resetgate_hidden = self.nonlinearity_resetgate_hidden(resetgate_hidden)
             updategate = self.nonlinearity_updategate(updategate)
@@ -1575,7 +1601,8 @@ class SGRULayer(MergeLayer):
             # Compute i_t \odot (W_{xc}x_t) + r_t \odot (W_{hc} h_{t - 1})
             hidden_update_in = slice_w(input_n, 3)
             hidden_update_hid = slice_w(hid_input, 3)
-            hidden_update = resetgate_input * hidden_update_in + resetgate_hidden * hidden_update_hid
+            hidden_update_b = slice_b(b_stacked, 3)
+            hidden_update = resetgate_input * hidden_update_in + resetgate_hidden * hidden_update_hid + hidden_update_b
             if self.grad_clipping:
                 hidden_update = theano.gradient.grad_clip(
                     hidden_update, -self.grad_clipping, self.grad_clipping)
@@ -1610,11 +1637,11 @@ class SGRULayer(MergeLayer):
             hid_init = T.dot(T.ones((num_batch, 1)), self.hid_init)
 
         # The hidden-to-hidden weight matrix is always used in step
-        non_seqs = [W_hid_stacked]
+        non_seqs = [W_hid_stacked, b_stacked]
         # When we aren't precomputing the input outside of scan, we need to
         # provide the input weights and biases to the step function
         if not self.precompute_input:
-            non_seqs += [W_in_stacked, b_stacked]
+            non_seqs += [W_in_stacked]
 
         if not deterministic and self.p:
             one = T.constant(1)

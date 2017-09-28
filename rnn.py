@@ -11,6 +11,8 @@ import lasagne.nonlinearities as nonlinearities
 from lasagne.layers import RecurrentLayer, Gate, DenseLayer
 from neuronlp.layers import SGRULayer, GRULayer, LSTMLayer
 
+np.set_printoptions(linewidth=np.nan, threshold=np.nan, suppress=True)
+
 BATCH_SIZE = 128
 
 
@@ -33,7 +35,7 @@ def construct_position_input(batch_size, length, num_units):
     return embedding_layer
 
 
-def train(layer_output, input_var, target_var, batch_size, length, position, binominal):
+def train(layer_output, layer_rnn, input_var, target_var, batch_size, length, position, binominal):
     predictions = lasagne.layers.get_output(layer_output)
     acc = lasagne.objectives.binary_accuracy(predictions, target_var)
     acc = acc.sum()
@@ -59,9 +61,6 @@ def train(layer_output, input_var, target_var, batch_size, length, position, bin
         for step in xrange(steps_per_epoch):
             x, y = get_batch(batch_size, position, binominal, length)
             err, corr, pred = train_fn(x, y)
-            # print x
-            # print y
-            # print pred
             loss += err
             correct += corr
             num_inst = (step + 1) * batch_size
@@ -71,7 +70,59 @@ def train(layer_output, input_var, target_var, batch_size, length, position, bin
         print 'inst: %d loss: %.4f, corr: %d, acc: %.2f%%, time: %.2fs' % (
             num_inst, loss / num_inst, correct, correct * 100 / num_inst, time.time() - start_time)
 
+    # layer_rnn.only_return_final = False
+    # hiddens = lasagne.layers.get_output(layer_rnn)
+    # resetgates, updategates = layer_rnn.get_gates()
+    # w_r = layer_rnn.W_hid_to_resetgate
+    # u_r = layer_rnn.W_in_to_resetgate
+    # b_r = layer_rnn.b_resetgate
+    # w_z = layer_rnn.W_hid_to_updategate
+    # u_z = layer_rnn.W_in_to_updategate
+    # b_z = layer_rnn.b_updategate
+    # w_c = layer_rnn.W_hid_to_hidden_update
+    # u_c = layer_rnn.W_in_to_hidden_update
+    # b_c = layer_rnn.b_hidden_update
+    # ana_fn = theano.function([input_var, target_var],
+    #                          [hiddens, resetgates, updategates, predictions, acc, w_r, u_r, b_r, w_z, u_z, b_z, w_c,
+    #                           u_c, b_c])
+    # print 'Analysis: length=%d, position=%d, %s' % (length, position, 'binominal' if binominal else 'uniform')
+    # for step in xrange(1000):
+    #     x, y = get_batch(1, position, binominal, length)
+    #     hids, rs, ups, preds, corr, wr, ur, br, wz, uz, bz, wc, uc, bc = ana_fn(x, y)
+    #
+    #     print 'x=%s|y=%s' % (x.reshape(length), y)
+    #     print 'pred=(%.2f, %.2f)' % ((1 - preds[0]), preds[0])
+    #     print 'reset gate: '
+    #     print wr.T, ur.T, br.T
+    #     print 'update gate: '
+    #     print wz.T, uz.T, bz.T
+    #     print 'cell: '
+    #     print wc.T, uc.T, bc.T
+    #     print hids.reshape([length, -1])
+    #     print rs.reshape(length)
+    #     print ups.reshape(length)
+    #
+    #     for i in xrange(length):
+    #         print 'input x[%d]' % i
+    #         x[0, i] = float(raw_input())
+    #     y[:] = (x[:, position]) > 0.0
+    #
+    #     hids, rs, ups, preds, corr, wr, ur, br, wz, uz, bz, wc, uc, bc = ana_fn(x, y)
+    #
+    #     print 'x=%s|y=%s' % (x.reshape(length), y)
+    #     print 'pred=(%.2f, %.2f)' % ((1 - preds[0]), preds[0])
+    #     print 'reset gate: '
+    #     print wr.T, ur.T, br.T
+    #     print 'update gate: '
+    #     print wz.T, uz.T, bz.T
+    #     print 'cell: '
+    #     print wc.T, uc.T, bc.T
+    #     print hids.reshape([length, -1])
+    #     print rs.reshape(length)
+    #     print ups.reshape(length)
+
     return accuracies[-50:].mean()
+
 
 def exe_rnn(use_embedd, length, num_units, position, binominal):
     batch_size = BATCH_SIZE
@@ -130,13 +181,14 @@ def exe_lstm(use_embedd, length, num_units, position, binominal):
 
     return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
 
+
 def exe_gru(use_embedd, length, num_units, position, binominal, reset_input):
     batch_size = BATCH_SIZE
 
     input_var = T.tensor3(name='inputs', dtype=theano.config.floatX)
     target_var = T.ivector(name='targets')
 
-    layer_input = lasagne.layers.InputLayer(shape=(None, length, 1), input_var=input_var, name='input')
+    layer_input = lasagne.layers.InputLayer(shape=(batch_size, length, 1), input_var=input_var, name='input')
     if use_embedd:
         layer_position = construct_position_input(batch_size, length, num_units)
         layer_input = lasagne.layers.concat([layer_input, layer_position], axis=2)
@@ -157,7 +209,7 @@ def exe_gru(use_embedd, length, num_units, position, binominal, reset_input):
 
     layer_output = DenseLayer(layer_gru, num_units=1, nonlinearity=nonlinearities.sigmoid, name='output')
 
-    return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
+    return train(layer_output, layer_gru, input_var, target_var, batch_size, length, position, binominal)
 
 
 def exe_gru0(use_embedd, length, num_units, position, binominal):
@@ -189,7 +241,7 @@ def exe_sgru(use_embedd, length, num_units, position, binominal):
                         b=lasagne.init.Constant(0.), nonlinearity=nonlinearities.tanh)
 
     layer_sgru = SGRULayer(layer_input, num_units, resetgate_input=resetgate_input, resetgate_hidden=resetgate_hidden,
-                          updategate=updategate, hidden_update=hiden_update, only_return_final=True, name='SGRU')
+                           updategate=updategate, hidden_update=hiden_update, only_return_final=True, name='SGRU')
 
     # W = layer_gru.W_hid_to_hidden_update.sum()
     # U = layer_gru.W_in_to_hidden_update.sum()
@@ -197,15 +249,17 @@ def exe_sgru(use_embedd, length, num_units, position, binominal):
 
     layer_output = DenseLayer(layer_sgru, num_units=1, nonlinearity=nonlinearities.sigmoid, name='output')
 
-    return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
+    return train(layer_output, layer_sgru, input_var, target_var, batch_size, length, position, binominal)
 
 
 def main():
     parser = argparse.ArgumentParser(description='Tuning with bi-directional RNN')
-    parser.add_argument('--architec', choices=['rnn', 'lstm', 'gru0', 'gru1', 'sgru'], help='architecture of rnn', required=True)
+    parser.add_argument('--architec', choices=['rnn', 'lstm', 'gru0', 'gru1', 'sgru'], help='architecture of rnn',
+                        required=True)
     parser.add_argument('--num_units', type=int, default=2, help='Number of units')
     parser.add_argument('--use_embedd', action='store_true', help='If use positional embedding')
-    parser.add_argument('--binominal', action='store_true', help='If the data are sampled from bi-nominal distribution.')
+    parser.add_argument('--binominal', action='store_true',
+                        help='If the data are sampled from bi-nominal distribution.')
     args = parser.parse_args()
 
     architec = args.architec
@@ -233,7 +287,8 @@ def main():
     for length in [5, 10, 20, 40, 50]:
         result = 0.
         position = 0
-        print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (architec, NUM_UNITS, length, position, USE_EMBEDD)
+        print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (
+        architec, NUM_UNITS, length, position, USE_EMBEDD)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
         for run in range(num_runs):
@@ -247,7 +302,8 @@ def main():
 
         result = 0.
         position = (length - 1) / 2
-        print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (architec, NUM_UNITS, length, position, USE_EMBEDD)
+        print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (
+        architec, NUM_UNITS, length, position, USE_EMBEDD)
         fp.write('length=%d, pos=%d:\n' % (length, position))
         fp.flush()
         for run in range(num_runs):
