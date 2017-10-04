@@ -17,7 +17,7 @@ from lasagne.updates import nesterov_momentum, adam
 
 from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
-from neuronlp.layers.recurrent import LSTMLayer
+from neuronlp.layers.recurrent import LSTMLayer, GRULayer, SGRULayer
 from neuronlp.layers.conv import ConvTimeStep1DLayer
 from neuronlp.layers.pool import PoolTimeStep1DLayer
 
@@ -25,7 +25,22 @@ WORD_DIM = 100
 CHARACTER_DIM = 30
 
 
-def build_std_dropout(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
+def build_std_dropout(architec, incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
+    if architec == 'lstm':
+        return build_std_dropout_lstm(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p)
+    elif architec == 'gru0':
+        return build_std_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
+                                     False)
+    elif architec == 'gru1':
+        return build_std_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
+                                     True)
+    elif architec == 'sgru':
+        return build_std_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p)
+    else:
+        pass
+
+
+def build_std_dropout_lstm(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
     # Construct Bi-directional LSTM-CNNs-CRF with standard dropout.
     # first get some necessary dimensions or parameters
     conv_window = 3
@@ -95,7 +110,143 @@ def build_std_dropout(incoming1, incoming2, num_units, num_labels, mask, grad_cl
 
     return layer_output
 
-def build_recur_dropout(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
+
+def build_std_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
+                          reset_input):
+    # Construct Bi-directional LSTM-CNNs-CRF with standard dropout.
+    # first get some necessary dimensions or parameters
+    conv_window = 3
+    # shape = [batch, n-step, c_dim, char_length]
+    incoming1 = lasagne.layers.DropoutLayer(incoming1, p=p)
+
+    # construct convolution layer
+    # shape = [batch, n-step, c_filters, output_length]
+    cnn_layer = ConvTimeStep1DLayer(incoming1, num_filters=num_filters, filter_size=conv_window, pad='full',
+                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+    # infer the pool size for pooling (pool size should go through all time step of cnn)
+    _, _, _, pool_size = cnn_layer.output_shape
+    # construct max pool layer
+    # shape = [batch, n-step, c_filters, 1]
+    pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
+    # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
+    output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+
+    # finally, concatenate the two incoming layers together.
+    # shape = [batch, n-step, c_filter&w_dim]
+    incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
+
+    # dropout for incoming
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2)
+
+    resetgate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                 W_cell=None, nonlinearity=nonlinearities.tanh)
+    gru_forward = GRULayer(incoming, num_units, mask_input=mask, resetgate=resetgate_forward,
+                           updategate=updategate_forward, hidden_update=hidden_update_forward,
+                           grad_clipping=grad_clipping, reset_input=reset_input, name='forward')
+
+    resetgate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                  W_cell=None, nonlinearity=nonlinearities.tanh)
+    gru_backward = GRULayer(incoming, num_units, mask_input=mask, backwards=True, resetgate=resetgate_backward,
+                            updategate=updategate_backward, hidden_update=hidden_update_backward,
+                            grad_clipping=grad_clipping, reset_input=reset_input, name='backward')
+
+    # concatenate the outputs of forward and backward LSTMs to combine them.
+    bi_gru_cnn = lasagne.layers.concat([gru_forward, gru_backward], axis=2, name="bi-gru")
+
+    bi_gru_cnn = lasagne.layers.DropoutLayer(bi_gru_cnn, p=p)
+
+    # reshape bi-rnn-cnn to [batch * max_length, num_units]
+    bi_gru_cnn = lasagne.layers.reshape(bi_gru_cnn, (-1, [2]))
+
+    # construct output layer (dense layer with softmax)
+    layer_output = lasagne.layers.DenseLayer(bi_gru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
+                                             name='softmax')
+
+    return layer_output
+
+
+def build_std_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
+    # Construct Bi-directional LSTM-CNNs-CRF with standard dropout.
+    # first get some necessary dimensions or parameters
+    conv_window = 3
+    # shape = [batch, n-step, c_dim, char_length]
+    incoming1 = lasagne.layers.DropoutLayer(incoming1, p=p)
+
+    # construct convolution layer
+    # shape = [batch, n-step, c_filters, output_length]
+    cnn_layer = ConvTimeStep1DLayer(incoming1, num_filters=num_filters, filter_size=conv_window, pad='full',
+                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+    # infer the pool size for pooling (pool size should go through all time step of cnn)
+    _, _, _, pool_size = cnn_layer.output_shape
+    # construct max pool layer
+    # shape = [batch, n-step, c_filters, 1]
+    pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
+    # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
+    output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+
+    # finally, concatenate the two incoming layers together.
+    # shape = [batch, n-step, c_filter&w_dim]
+    incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
+
+    # dropout for incoming
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2)
+
+    resetgate_input_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    resetgate_hidden_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                 W_cell=None, nonlinearity=nonlinearities.tanh)
+    sgru_forward = SGRULayer(incoming, num_units, mask_input=mask,
+                             resetgate_input=resetgate_input_forward, resetgate_hidden=resetgate_hidden_forward,
+                             updategate=updategate_forward, hidden_update=hidden_update_forward,
+                             grad_clipping=grad_clipping, name='forward')
+
+    resetgate_input_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    resetgate_hidden_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                  W_cell=None, nonlinearity=nonlinearities.tanh)
+    sgru_backward = SGRULayer(incoming, num_units, mask_input=mask, backwards=True,
+                              resetgate_input=resetgate_input_backward, resetgate_hidden=resetgate_hidden_backward,
+                              updategate=updategate_backward, hidden_update=hidden_update_backward,
+                              grad_clipping=grad_clipping, name='backward')
+
+    # concatenate the outputs of forward and backward LSTMs to combine them.
+    bi_sgru_cnn = lasagne.layers.concat([sgru_forward, sgru_backward], axis=2, name="bi-sgru")
+
+    bi_sgru_cnn = lasagne.layers.DropoutLayer(bi_sgru_cnn, p=p)
+
+    # reshape bi-rnn-cnn to [batch * max_length, num_units]
+    bi_sgru_cnn = lasagne.layers.reshape(bi_sgru_cnn, (-1, [2]))
+
+    # construct output layer (dense layer with softmax)
+    layer_output = lasagne.layers.DenseLayer(bi_sgru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
+                                             name='softmax')
+
+    return layer_output
+
+
+def build_recur_dropout(architec, incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
+    if architec == 'lstm':
+        return build_recur_dropout_lstm(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters,
+                                        p)
+    elif architec == 'gru0':
+        return build_recur_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
+                                       False)
+    elif architec == 'gru1':
+        return build_recur_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
+                                       True)
+    elif architec == 'sgru':
+        return build_recur_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p)
+    else:
+        pass
+
+
+def build_recur_dropout_lstm(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
     # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
     # first get some necessary dimensions or parameters
     conv_window = 3
@@ -164,7 +315,122 @@ def build_recur_dropout(incoming1, incoming2, num_units, num_labels, mask, grad_
     return layer_output
 
 
-def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, dropout, num_units, num_labels,
+def build_recur_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
+                            reset_input):
+    # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
+    # first get some necessary dimensions or parameters
+    conv_window = 3
+    # shape = [batch, n-step, c_dim, char_length]
+    # construct convolution layer
+    # shape = [batch, n-step, c_filters, output_length]
+    cnn_layer = ConvTimeStep1DLayer(incoming1, num_filters=num_filters, filter_size=conv_window, pad='full',
+                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+    # infer the pool size for pooling (pool size should go through all time step of cnn)
+    _, _, _, pool_size = cnn_layer.output_shape
+    # construct max pool layer
+    # shape = [batch, n-step, c_filters, 1]
+    pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
+    # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
+    output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+
+    # finally, concatenate the two incoming layers together.
+    # shape = [batch, n-step, c_filter&w_dim]
+    incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
+
+    # dropout for incoming
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2, shared_axes=(1,))
+
+    resetgate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                 W_cell=None, nonlinearity=nonlinearities.tanh)
+    gru_forward = GRULayer(incoming, num_units, mask_input=mask, resetgate=resetgate_forward,
+                           updategate=updategate_forward, hidden_update=hidden_update_forward,
+                           grad_clipping=grad_clipping, reset_input=reset_input, p=p, name='forward')
+
+    resetgate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                  W_cell=None, nonlinearity=nonlinearities.tanh)
+    gru_backward = GRULayer(incoming, num_units, mask_input=mask, backwards=True, resetgate=resetgate_backward,
+                            updategate=updategate_backward, hidden_update=hidden_update_backward,
+                            grad_clipping=grad_clipping, reset_input=reset_input, p=p, name='backward')
+
+    # concatenate the outputs of forward and backward LSTMs to combine them.
+    bi_gru_cnn = lasagne.layers.concat([gru_forward, gru_backward], axis=2, name="bi-lstm")
+    # shape = [batch, n-step, num_units]
+    bi_gru_cnn = lasagne.layers.DropoutLayer(bi_gru_cnn, p=p, shared_axes=(1,))
+
+    # reshape bi-rnn-cnn to [batch * max_length, num_units]
+    bi_gru_cnn = lasagne.layers.reshape(bi_gru_cnn, (-1, [2]))
+
+    # construct output layer (dense layer with softmax)
+    layer_output = lasagne.layers.DenseLayer(bi_gru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
+                                             name='softmax')
+
+    return layer_output
+
+
+def build_recur_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p):
+    # Construct Bi-directional LSTM-CNNs-CRF with recurrent dropout.
+    # first get some necessary dimensions or parameters
+    conv_window = 3
+    # shape = [batch, n-step, c_dim, char_length]
+    # construct convolution layer
+    # shape = [batch, n-step, c_filters, output_length]
+    cnn_layer = ConvTimeStep1DLayer(incoming1, num_filters=num_filters, filter_size=conv_window, pad='full',
+                                    nonlinearity=lasagne.nonlinearities.tanh, name='cnn')
+    # infer the pool size for pooling (pool size should go through all time step of cnn)
+    _, _, _, pool_size = cnn_layer.output_shape
+    # construct max pool layer
+    # shape = [batch, n-step, c_filters, 1]
+    pool_layer = PoolTimeStep1DLayer(cnn_layer, pool_size=pool_size)
+    # reshape: [batch, n-step, c_filters, 1] --> [batch, n-step, c_filters]
+    output_cnn_layer = lasagne.layers.reshape(pool_layer, ([0], [1], [2]))
+
+    # finally, concatenate the two incoming layers together.
+    # shape = [batch, n-step, c_filter&w_dim]
+    incoming = lasagne.layers.concat([output_cnn_layer, incoming2], axis=2)
+
+    # dropout for incoming
+    incoming = lasagne.layers.DropoutLayer(incoming, p=0.2, shared_axes=(1,))
+
+    resetgate_input_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    resetgate_hidden_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_forward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                 W_cell=None, nonlinearity=nonlinearities.tanh)
+    sgru_forward = SGRULayer(incoming, num_units, mask_input=mask,
+                             resetgate_input=resetgate_input_forward, resetgate_hidden=resetgate_hidden_forward,
+                             updategate=updategate_forward, hidden_update=hidden_update_forward,
+                             grad_clipping=grad_clipping, p=p, name='forward')
+
+    resetgate_input_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    resetgate_hidden_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    updategate_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
+    hidden_update_backward = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                  W_cell=None, nonlinearity=nonlinearities.tanh)
+    sgru_backward = SGRULayer(incoming, num_units, mask_input=mask, backwards=True,
+                              resetgate_input=resetgate_input_backward, resetgate_hidden=resetgate_hidden_backward,
+                              updategate=updategate_backward, hidden_update=hidden_update_backward,
+                              grad_clipping=grad_clipping, p=p, name='backward')
+
+    # concatenate the outputs of forward and backward LSTMs to combine them.
+    bi_sgru_cnn = lasagne.layers.concat([sgru_forward, sgru_backward], axis=2, name="bi-lstm")
+    # shape = [batch, n-step, num_units]
+    bi_sgru_cnn = lasagne.layers.DropoutLayer(bi_sgru_cnn, p=p, shared_axes=(1,))
+
+    # reshape bi-rnn-cnn to [batch * max_length, num_units]
+    bi_sgru_cnn = lasagne.layers.reshape(bi_sgru_cnn, (-1, [2]))
+
+    # construct output layer (dense layer with softmax)
+    layer_output = lasagne.layers.DenseLayer(bi_sgru_cnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
+                                             name='softmax')
+
+    return layer_output
+
+
+def build_network(architec, word_var, char_var, mask_var, word_alphabet, char_alphabet, dropout, num_units, num_labels,
                   grad_clipping=5.0, num_filters=30, p=0.5):
     def generate_random_embedding(scale, shape):
         return np.random.uniform(-scale, scale, shape).astype(theano.config.floatX)
@@ -216,17 +482,19 @@ def build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, dr
     layer_mask = lasagne.layers.InputLayer(shape=(None, None), input_var=mask_var, name='mask')
 
     if dropout == 'std':
-        return build_std_dropout(layer_char_input, layer_word_input, num_units, num_labels, layer_mask,
+        return build_std_dropout(architec, layer_char_input, layer_word_input, num_units, num_labels, layer_mask,
                                  grad_clipping, num_filters, p)
     elif dropout == 'recurrent':
-        return build_recur_dropout(layer_char_input, layer_word_input, num_units, num_labels, layer_mask,
+        return build_recur_dropout(architec, layer_char_input, layer_word_input, num_units, num_labels, layer_mask,
                                    grad_clipping, num_filters, p)
     else:
         raise ValueError('unkown dropout patten: %s' % dropout)
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Tuning with bi-directional LSTM-CNN')
+    parser = argparse.ArgumentParser(description='Tuning with bi-directional RNN-CNN')
+    parser.add_argument('--architec', choices=['rnn', 'lstm', 'gru0', 'gru1', 'sgru'], help='architecture of rnn',
+                        required=True)
     parser.add_argument('--num_epochs', type=int, default=1000, help='Number of training epochs')
     parser.add_argument('--batch_size', type=int, default=16, help='Number of sentences in each batch')
     parser.add_argument('--num_units', type=int, default=100, help='Number of hidden units in LSTM')
@@ -245,7 +513,8 @@ def main():
 
     args = parser.parse_args()
 
-    logger = get_logger("Sequence Labeling (LSTM-CNN)")
+    logger = get_logger("Sequence Labeling (RNN-CNN)")
+    architec = args.architec
     train_path = args.train
     dev_path = args.dev
     test_path = args.test
@@ -262,12 +531,11 @@ def main():
     schedule = args.schedule
     output_predict = args.output_prediction
     dropout = args.dropout
-    p = 0.33
+    p = 0.5
 
     logger.info("Creating Alphabets")
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
-                                                                                            [train_path, dev_path,
-                                                                                             test_path],
+                                                                                            [train_path],
                                                                                             40000)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     logger.info("Character Alphabet Size: %d" % char_alphabet.size())
@@ -290,10 +558,10 @@ def main():
     word_var = T.imatrix(name='inputs')
     char_var = T.itensor3(name='char-inputs')
 
-    network = build_network(word_var, char_var, mask_var, word_alphabet, char_alphabet, dropout, num_units, num_labels,
-                            grad_clipping, num_filters, p)
+    network = build_network(architec, word_var, char_var, mask_var, word_alphabet, char_alphabet, dropout, num_units,
+                            num_labels, grad_clipping, num_filters, p)
 
-    logger.info("Network structure: hidden=%d, filter=%d, dropout=%s" % (num_units, num_filters, dropout))
+    logger.info("Network structure: %s, hidden=%d, filter=%d, dropout=%s" % (architec, num_units, num_filters, dropout))
     # compute loss
     num_tokens = mask_var.sum(dtype=theano.config.floatX)
     num_tokens_nr = mask_nr_var.sum(dtype=theano.config.floatX)
@@ -358,7 +626,7 @@ def main():
     test_inst = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
-        print 'Epoch %d (learning rate=%.4f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
+        print 'Epoch %d (%s, learning rate=%.4f, decay rate=%.4f): ' % (epoch, architec, lr, decay_rate)
         train_err = 0.0
         train_corr = 0.0
         train_corr_nr = 0.0
@@ -414,7 +682,8 @@ def main():
             dev_inst += wids.shape[0]
         assert dev_total == dev_total_nr + dev_inst
         print 'dev corr: %d, total: %d, acc: %.2f%%, no root corr: %d, total: %d, acc: %.2f%%' % (
-            dev_corr, dev_total, dev_corr * 100 / dev_total, dev_corr_nr, dev_total_nr, dev_corr_nr * 100 / dev_total_nr)
+            dev_corr, dev_total, dev_corr * 100 / dev_total, dev_corr_nr, dev_total_nr,
+            dev_corr_nr * 100 / dev_total_nr)
 
         if dev_correct_nr < dev_corr_nr:
             dev_correct = dev_corr
@@ -451,7 +720,7 @@ def main():
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
             train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
-                                       [loss_train,corr_train, corr_nr_train, num_tokens, num_tokens_nr],
+                                       [loss_train, corr_train, corr_nr_train, num_tokens, num_tokens_nr],
                                        updates=updates)
 
 
