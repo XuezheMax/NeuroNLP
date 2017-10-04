@@ -1003,8 +1003,7 @@ class GRULayer(MergeLayer):
     def __init__(self, incoming, num_units,
                  resetgate=Gate(W_cell=None),
                  updategate=Gate(W_cell=None),
-                 hidden_update=Gate(W_cell=None,
-                                    nonlinearity=nonlinearities.tanh),
+                 hidden_update=Gate(W_cell=None, nonlinearity=nonlinearities.tanh),
                  hid_init=init.Constant(0.),
                  reset_input=False,
                  backwards=False,
@@ -1274,7 +1273,7 @@ class GRULayer(MergeLayer):
             # Retrieve the dimensionality of the incoming layer
             input_shape = self.input_shapes[0]
             # Explicitly unroll the recurrence instead of using scan
-            hid_out, reset_out, update_out = unroll_scan(
+            hid_out = unroll_scan(
                 fn=step_fun,
                 sequences=sequences,
                 outputs_info=[hid_init],
@@ -1284,7 +1283,7 @@ class GRULayer(MergeLayer):
         else:
             # Scan op iterates over first dimension of input and repeatedly
             # applies the step function
-            hid_out, reset_out, update_out = theano.scan(
+            hid_out = theano.scan(
                 fn=step_fun,
                 sequences=sequences,
                 go_backwards=self.backwards,
