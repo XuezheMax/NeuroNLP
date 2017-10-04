@@ -9,7 +9,7 @@ import lasagne
 
 import lasagne.nonlinearities as nonlinearities
 from lasagne.layers import RecurrentLayer, Gate, DenseLayer
-from neuronlp.layers import SGRULayer, GRULayer, LSTMLayer
+from neuronlp.layers import SGRULayer, GRULayer_ANA, LSTMLayer
 
 np.set_printoptions(linewidth=np.nan, threshold=np.nan, suppress=True)
 
@@ -200,7 +200,7 @@ def exe_gru(use_embedd, length, num_units, position, binominal, reset_input):
     hiden_update = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                         b=lasagne.init.Constant(0.), nonlinearity=nonlinearities.tanh)
 
-    layer_gru = GRULayer(layer_input, num_units, resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
+    layer_gru = GRULayer_ANA(layer_input, num_units, resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
                          reset_input=reset_input, only_return_final=True, name='GRU')
 
     # W = layer_gru.W_hid_to_hidden_update.sum()

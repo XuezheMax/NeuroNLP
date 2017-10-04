@@ -357,7 +357,7 @@ def build_recur_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, g
                             grad_clipping=grad_clipping, reset_input=reset_input, p=p, name='backward')
 
     # concatenate the outputs of forward and backward LSTMs to combine them.
-    bi_gru_cnn = lasagne.layers.concat([gru_forward, gru_backward], axis=2, name="bi-lstm")
+    bi_gru_cnn = lasagne.layers.concat([gru_forward, gru_backward], axis=2, name="bi-gru")
     # shape = [batch, n-step, num_units]
     bi_gru_cnn = lasagne.layers.DropoutLayer(bi_gru_cnn, p=p, shared_axes=(1,))
 
@@ -416,7 +416,7 @@ def build_recur_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, 
                               grad_clipping=grad_clipping, p=p, name='backward')
 
     # concatenate the outputs of forward and backward LSTMs to combine them.
-    bi_sgru_cnn = lasagne.layers.concat([sgru_forward, sgru_backward], axis=2, name="bi-lstm")
+    bi_sgru_cnn = lasagne.layers.concat([sgru_forward, sgru_backward], axis=2, name="bi-sgru")
     # shape = [batch, n-step, num_units]
     bi_sgru_cnn = lasagne.layers.DropoutLayer(bi_sgru_cnn, p=p, shared_axes=(1,))
 
@@ -505,6 +505,7 @@ def main():
     parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
     parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     parser.add_argument('--dropout', choices=['std', 'recurrent'], help='dropout patten')
+    parser.add_argument('--p', type=float, default=0.5, help='dropout rate')
     parser.add_argument('--schedule', nargs='+', type=int, help='schedule for learning rate decay')
     parser.add_argument('--output_prediction', action='store_true', help='Output predictions to temp files')
     parser.add_argument('--train')  # "data/POS-penn/wsj/split1/wsj1.train.original"
@@ -531,7 +532,7 @@ def main():
     schedule = args.schedule
     output_predict = args.output_prediction
     dropout = args.dropout
-    p = 0.5
+    p = args.p
 
     logger.info("Creating Alphabets")
     word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
