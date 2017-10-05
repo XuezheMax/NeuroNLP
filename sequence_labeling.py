@@ -256,8 +256,8 @@ def main():
     p = 0.5
 
     logger.info("Creating Alphabets")
-    word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
-                                                                                            [train_path], 40000)
+    word_alphabet, char_alphabet, pos_alphabet, \
+        type_alphabet = data_utils.create_alphabets("data/alphabets/", [train_path, dev_path, test_path], 40000)
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     logger.info("Character Alphabet Size: %d" % char_alphabet.size())
     logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
