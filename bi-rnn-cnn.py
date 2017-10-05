@@ -241,7 +241,8 @@ def build_recur_dropout(architec, incoming1, incoming2, num_units, num_labels, m
         return build_recur_dropout_gru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p,
                                        True)
     elif architec == 'sgru':
-        return build_recur_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters, p)
+        return build_recur_dropout_sgru(incoming1, incoming2, num_units, num_labels, mask, grad_clipping, num_filters,
+                                        p)
     else:
         pass
 
@@ -535,9 +536,9 @@ def main():
     p = args.p
 
     logger.info("Creating Alphabets")
-    word_alphabet, char_alphabet, pos_alphabet, type_alphabet = data_utils.create_alphabets("data/alphabets/",
-                                                                                            [train_path],
-                                                                                            40000)
+    word_alphabet, char_alphabet, pos_alphabet, \
+        type_alphabet = data_utils.create_alphabets("data/alphabets/", [train_path, dev_path, test_path], 40000)
+
     logger.info("Word Alphabet Size: %d" % word_alphabet.size())
     logger.info("Character Alphabet Size: %d" % char_alphabet.size())
     logger.info("POS Alphabet Size: %d" % pos_alphabet.size())
