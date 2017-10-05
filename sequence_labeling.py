@@ -442,7 +442,8 @@ def main():
             test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr, best_epoch)
 
         if epoch in schedule:
-            lr = lr * decay_rate
+            # lr = lr * decay_rate
+            lr = learning_rate / (1.0 + epoch * decay_rate)
             # updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
             updates = nesterov_momentum(loss_train, params=params, learning_rate=lr, momentum=0.9)
             train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
