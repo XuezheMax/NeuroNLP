@@ -12,13 +12,13 @@ import numpy as np
 import lasagne
 import theano
 import theano.tensor as T
-from lasagne.layers import Gate, LSTMLayer, GRULayer
+from lasagne.layers import Gate
 from lasagne import nonlinearities
 from lasagne.updates import adam
 
 from neuronlp.io import get_logger
 from neuronlp import utils
-from neuronlp.layers.recurrent import MAXRULayer
+from neuronlp.layers.recurrent import LSTMLayer, GRULayer, SGRULayer
 
 UNK = 0
 WORD_DIM = 100
@@ -26,8 +26,8 @@ WORD_DIM = 100
 _buckets = [10, 20, 30, 40, 50, 60]
 
 
-def build_RNN(architec, layer_input, layer_mask, num_units, num_time_units, max_length, grad_clipping):
-    def build_GRU():
+def build_RNN(architec, layer_input, layer_mask, num_units, grad_clipping):
+    def build_GRU(reset_input):
         resetgate = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
 
         updategate = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
@@ -37,7 +37,7 @@ def build_RNN(architec, layer_input, layer_mask, num_units, num_time_units, max_
 
         return GRULayer(layer_input, num_units, mask_input=layer_mask, grad_clipping=grad_clipping,
                         resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
-                        only_return_final=True, name='GRU')
+                        reset_input=reset_input, only_return_final=True, p=0.5, name='GRU')
 
     def build_LSTM():
         ingate = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
@@ -54,36 +54,35 @@ def build_RNN(architec, layer_input, layer_mask, num_units, num_time_units, max_
 
         return LSTMLayer(layer_input, num_units, mask_input=layer_mask, grad_clipping=grad_clipping,
                          ingate=ingate, forgetgate=forgetgate, cell=cell, outgate=outgate,
-                         peepholes=False, nonlinearity=nonlinearities.tanh, only_return_final=True, name='LSTM')
+                         peepholes=False, nonlinearity=nonlinearities.tanh,
+                         only_return_final=True, p=0.5, name='LSTM')
 
-    def build_MAXRU():
-        time_updategate = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None)
-
-        time_update = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
-                           b=lasagne.init.Constant(0.), nonlinearity=nonlinearities.tanh)
-
-        resetgate = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+    def build_SGRU():
+        resetgate_hidden = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                          W_cell=lasagne.init.GlorotUniform())
+
+        resetgate_input = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
+                                W_cell=lasagne.init.GlorotUniform())
 
         updategate = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(),
                           W_cell=lasagne.init.GlorotUniform())
 
-        hiden_update = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
+        hidden_update = Gate(W_in=lasagne.init.GlorotUniform(), W_hid=lasagne.init.GlorotUniform(), W_cell=None,
                             b=lasagne.init.Constant(0.), nonlinearity=nonlinearities.tanh)
 
-        return MAXRULayer(layer_input, num_units, num_time_units=num_time_units, max_length=max_length,
-                          mask_input=layer_mask, grad_clipping=grad_clipping,
-                          P_time=lasagne.init.GlorotUniform(), nonlinearity=nonlinearities.tanh,
-                          resetgate=resetgate, updategate=updategate, hidden_update=hiden_update,
-                          time_updategate=time_updategate, time_update=time_update,
-                          only_return_final=True, name='MAXRU', p=0.)
+        return SGRULayer(layer_input, num_units, mask_input=layer_mask, grad_clipping=grad_clipping,
+                         resetgate_input=resetgate_input, resetgate_hidden=resetgate_hidden,
+                         updategate=updategate, hidden_update=hidden_update,
+                         only_return_final=True, p=0.5, name='SGRU')
 
-    if architec == 'gru':
-        return build_GRU()
+    if architec == 'gru0':
+        return build_GRU(False)
+    elif architec == 'gru1':
+        return build_GRU(True)
     elif architec == 'lstm':
-        return build_GRU()
-    elif architec == 'maxru':
-        return build_MAXRU()
+        return build_LSTM()
+    elif architec == 'sgru':
+        return build_SGRU()
     else:
         raise ValueError('unkown architecture: %s' % architec)
 
@@ -166,12 +165,10 @@ def iterate_batch(data, batch_size, shuffle=False):
 
 def main():
     parser = argparse.ArgumentParser(description='Tuning with bi-directional MAXRU-CNN')
-    parser.add_argument('--use_position', action='store_true', help='If use positional embedding')
-    parser.add_argument('--architec', choices=['maxru', 'lstm', 'gru'], help='architecture of rnn', required=True)
+    parser.add_argument('--architec', choices=['sgru', 'lstm', 'gru0', 'gru1'], help='architecture of rnn', required=True)
     parser.add_argument('--num_epochs', type=int, default=1000, help='Number of training epochs')
     parser.add_argument('--batch_size', type=int, default=16, help='Number of sentences in each batch')
     parser.add_argument('--num_units', type=int, default=100, help='Number of hidden units in TARU')
-    parser.add_argument('--num_time_units', type=int, default=100, help='Number of hidden time units in TARU')
     parser.add_argument('--learning_rate', type=float, default=0.1, help='Learning rate')
     parser.add_argument('--decay_rate', type=float, default=0.1, help='Decay rate of learning rate')
     parser.add_argument('--grad_clipping', type=float, default=0, help='Gradient clipping')
@@ -179,16 +176,13 @@ def main():
     args = parser.parse_args()
 
     architec = args.architec
-    use_position = args.use_position
     num_epochs = args.num_epochs
     batch_size = args.batch_size
     num_units = args.num_units
-    num_time_units = args.num_time_units
     learning_rate = args.learning_rate
     decay_rate = args.decay_rate
     schedule = args.schedule
     grad_clipping = args.grad_clipping
-    max_length = 60
     logger = get_logger("Sentiment Classification (%s)" % (architec))
 
     def read_dataset(filename):
@@ -264,17 +258,10 @@ def main():
     layer_mask = lasagne.layers.InputLayer(shape=(None, None), input_var=mask_var, name='mask')
 
     layer_input = layer_word_input
-    position_var = T.imatrix(name='inputs')
-    if use_position:
-        layer_position = lasagne.layers.InputLayer(shape=(None, None), input_var=position_var, name='position')
-        layer_position = lasagne.layers.EmbeddingLayer(layer_position, input_size=max_length,
-                                                       output_size=num_time_units,
-                                                       W=lasagne.init.Constant(0.), name='position_embedd')
-        layer_input = lasagne.layers.concat([layer_input, layer_position], axis=2)
 
     layer_input = lasagne.layers.DropoutLayer(layer_input, p=0.2)
 
-    layer_rnn = build_RNN(architec, layer_input, layer_mask, num_units, num_time_units, max_length, grad_clipping)
+    layer_rnn = build_RNN(architec, layer_input, layer_mask, num_units, grad_clipping)
     layer_rnn = lasagne.layers.DropoutLayer(layer_rnn, p=0.5)
 
     network = lasagne.layers.DenseLayer(layer_rnn, num_units=num_labels, nonlinearity=nonlinearities.softmax,
@@ -295,14 +282,12 @@ def main():
     updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
 
     # Compile a function performing a training step on a mini-batch
-    train_fn = theano.function([word_var, target_var, mask_var, position_var],
-                               [loss_train, corr_train], updates=updates, on_unused_input='ignore')
+    train_fn = theano.function([word_var, target_var, mask_var], [loss_train, corr_train], updates=updates)
     # Compile a second function evaluating the loss and accuracy of network
-    eval_fn = theano.function([word_var, target_var, mask_var, position_var],
-                              [corr_eval, final_prediction], on_unused_input='ignore')
+    eval_fn = theano.function([word_var, target_var, mask_var], [corr_eval, final_prediction])
 
     # Finally, launch the training loop.
-    logger.info("%s: (#data: %d, batch size: %d, clip: %.1f)..." % (architec, num_data_train, batch_size, grad_clipping))
+    logger.info("%s: (#data: %d, batch size: %d, clip: %.1f)" % (architec, num_data_train, batch_size, grad_clipping))
 
     num_batches = num_data_train / batch_size + 1
     dev_correct = 0.0
@@ -311,7 +296,7 @@ def main():
     test_total = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
-        print 'Epoch %d (learning rate=%.4f, decay rate=%.4f): ' % (epoch, lr, decay_rate)
+        print 'Epoch %d (%s, learning rate=%.4f, decay rate=%.4f): ' % (epoch, architec, lr, decay_rate)
         train_err = 0.0
         train_corr = 0.0
         train_total = 0
@@ -320,9 +305,7 @@ def main():
         for batch in xrange(1, num_batches + 1):
             wids, tids, masks = get_batch(data_train, batch_size)
             num = wids.shape[0]
-            length = wids.shape[1]
-            poss = np.zeros_like(wids, dtype=np.int32) + np.arange(length, dtype=np.int32)
-            err, corr = train_fn(wids, tids, masks, poss)
+            err, corr = train_fn(wids, tids, masks)
             train_err += err * num
             train_corr += corr
             train_total += num
@@ -347,9 +330,7 @@ def main():
         for batch in iterate_batch(data_dev, batch_size):
             wids, tids, masks = batch
             num = wids.shape[0]
-            length = wids.shape[1]
-            poss = np.zeros_like(wids, dtype=np.int32) + np.arange(length, dtype=np.int32)
-            corr, predictions = eval_fn(wids, tids, masks, poss)
+            corr, predictions = eval_fn(wids, tids, masks)
             dev_corr += corr
             dev_total += num
 
@@ -366,9 +347,7 @@ def main():
             for batch in iterate_batch(data_test, batch_size):
                 wids, tids, masks = batch
                 num = wids.shape[0]
-                length = wids.shape[1]
-                poss = np.zeros_like(wids, dtype=np.int32) + np.arange(length, dtype=np.int32)
-                corr, predictions = eval_fn(wids, tids, masks, poss)
+                corr, predictions = eval_fn(wids, tids, masks)
                 test_corr += corr
                 test_total += num
 
@@ -382,8 +361,7 @@ def main():
         if epoch in schedule:
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
-            train_fn = theano.function([word_var, target_var, mask_var, position_var], [loss_train, corr_train],
-                                       updates=updates, on_unused_input='ignore')
+            train_fn = theano.function([word_var, target_var, mask_var], [loss_train, corr_train], updates=updates)
 
 
 if __name__ == '__main__':

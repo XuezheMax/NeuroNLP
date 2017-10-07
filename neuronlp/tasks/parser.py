@@ -220,9 +220,9 @@ def decode_MST(energies, masks):
             length += 1
 
         # calc real energy matrix shape = [length, length, num_labels - 2] (remove the label for root and pad symbol).
-        energy = energy[:length, :length, 2:]
+        energy = energy[:length, :length, 3:]
         # get best label for each edge.
-        label_id_matrix = energy.argmax(axis=2) + 2
+        label_id_matrix = energy.argmax(axis=2) + 3
         # get original score matrix
         orig_score_matrix = energy.max(axis=2)
         # initialize score matrix to original score matrix
