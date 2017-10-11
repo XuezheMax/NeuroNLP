@@ -100,4 +100,4 @@ def load_word_embedding_dict(embedding, embedding_path, normalize_digits=True):
         return embedd_dict, embedd_dim, False
 
     else:
-        raise ValueError("embedding should choose from [word2vec, senna]")
+        raise ValueError("embedding should choose from [word2vec, senna, glove, sskip, polyglot]")

@@ -179,7 +179,7 @@ def exe_lstm(use_embedd, length, num_units, position, binominal):
 
     layer_output = DenseLayer(layer_lstm, num_units=1, nonlinearity=nonlinearities.sigmoid, name='output')
 
-    return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
+    return train(layer_output, layer_lstm, input_var, target_var, batch_size, length, position, binominal)
 
 
 def exe_gru(use_embedd, length, num_units, position, binominal, reset_input):
