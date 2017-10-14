@@ -504,6 +504,7 @@ def main():
     parser.add_argument('--decay_rate', type=float, default=0.1, help='Decay rate of learning rate')
     parser.add_argument('--grad_clipping', type=float, default=0, help='Gradient clipping')
     parser.add_argument('--gamma', type=float, default=1e-6, help='weight for regularization')
+    parser.add_argument('--delta', type=float, default=0.0, help='weight for expectation-linear regularization')
     parser.add_argument('--regular', choices=['none', 'l2'], help='regularization for training', required=True)
     parser.add_argument('--dropout', choices=['std', 'recurrent'], help='dropout patten')
     parser.add_argument('--p', type=float, default=0.5, help='dropout rate')
@@ -527,6 +528,7 @@ def main():
     regular = args.regular
     grad_clipping = args.grad_clipping
     gamma = args.gamma
+    delta = args.delta
     learning_rate = args.learning_rate
     momentum = 0.9
     decay_rate = args.decay_rate
@@ -582,15 +584,19 @@ def main():
 
     # compute loss
     # for training, we use mean of loss over number of labels
-    loss_train = lasagne.objectives.categorical_crossentropy(prediction_train, target_var_flatten)
-    loss_train = (loss_train * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
+    loss_train_org = lasagne.objectives.categorical_crossentropy(prediction_train, target_var_flatten)
+    loss_train_org = (loss_train_org * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
+
+    loss_train_el = lasagne.objectives.squared_error(prediction_train * mask_var_flatten.dimshuffle(0, 'x'),
+                                                     prediction_eval * mask_var_flatten.dimshuffle(0, 'x'))
+    loss_train_el = loss_train_el.sum() / num_tokens
+
+    loss_train = loss_train_org + delta * loss_train_el
+
     # l2 regularization?
     if regular == 'l2':
         l2_penalty = lasagne.regularization.regularize_network_params(network, lasagne.regularization.l2)
         loss_train = loss_train + gamma * l2_penalty
-
-    loss_eval = lasagne.objectives.categorical_crossentropy(prediction_eval, target_var_flatten)
-    loss_eval = (loss_eval * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
 
     # compute number of correct labels
     corr_train = lasagne.objectives.categorical_accuracy(prediction_train, target_var_flatten)
@@ -607,15 +613,16 @@ def main():
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
-                               [loss_train, corr_train, corr_nr_train, num_tokens, num_tokens_nr], updates=updates)
+                               [loss_train, loss_train_org, loss_train_el,
+                                corr_train, corr_nr_train, num_tokens, num_tokens_nr], updates=updates)
     # Compile a second function evaluating the loss and accuracy of network
     eval_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
                               [corr_eval, corr_nr_eval, num_tokens, num_tokens_nr, final_prediction])
 
     # Finally, launch the training loop.
     logger.info(
-        "Start training: regularization: %s(%f), dropout: %s (#training data: %d, batch size: %d, clip: %.1f)..." \
-        % (regular, (0.0 if regular == 'none' else gamma), dropout, num_data, batch_size, grad_clipping))
+        "Start training: regular: %s(%f), dropout: %s delta: %.2f (#training data: %d, batch size: %d, clip: %.1f)" \
+        % (regular, (0.0 if regular == 'none' else gamma), dropout, delta, num_data, batch_size, grad_clipping))
 
     num_batches = num_data / batch_size + 1
     dev_correct = 0.0
@@ -625,11 +632,12 @@ def main():
     test_correct_nr = 0.0
     test_total = 0
     test_total_nr = 0
-    test_inst = 0
     lr = learning_rate
     for epoch in range(1, num_epochs + 1):
         print 'Epoch %d (%s, learning rate=%.4f, decay rate=%.4f): ' % (epoch, architec, lr, decay_rate)
         train_err = 0.0
+        train_err_org = 0.0
+        train_err_linear = 0.0
         train_corr = 0.0
         train_corr_nr = 0.0
         train_total = 0
@@ -641,8 +649,10 @@ def main():
             wids, cids, pids, _, _, masks = data_utils.get_batch(data_train, batch_size)
             masks_nr = np.copy(masks)
             masks_nr[:, 0] = 0
-            err, corr, corr_nr, num, num_nr = train_fn(wids, cids, pids, masks, masks_nr)
-            train_err += err * wids.shape[0]
+            err, err_org, err_linear, corr, corr_nr, num, num_nr = train_fn(wids, cids, pids, masks, masks_nr)
+            train_err += err * num
+            train_err_org += err_org * num
+            train_err_linear += err_linear * num
             train_corr += corr
             train_corr_nr += corr_nr
             train_total += num
@@ -653,18 +663,20 @@ def main():
 
             # update log
             sys.stdout.write("\b" * num_back)
-            log_info = 'train: %d/%d loss: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time left (estimated): %.2fs' % (
-                batch, num_batches, train_err / train_inst, train_corr * 100 / train_total,
-                train_corr_nr * 100 / train_total_nr, time_left)
+            log_info = 'train: %d/%d loss: %.4f, loss_org: %.4f, loss_linear: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time left (estimated): %.2fs' % (
+                batch, num_batches,
+                train_err / train_total, train_err_org / train_total, train_err_linear / train_total,
+                train_corr * 100 / train_total, train_corr_nr * 100 / train_total_nr, time_left)
             sys.stdout.write(log_info)
             num_back = len(log_info)
         # update training log after each epoch
         assert train_inst == num_batches * batch_size
         assert train_total == train_total_nr + train_inst
         sys.stdout.write("\b" * num_back)
-        print 'train: %d/%d loss: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time: %.2fs' % (
-            train_inst, train_inst, train_err / train_inst, train_corr * 100 / train_total,
-            train_corr_nr * 100 / train_total_nr, time.time() - start_time)
+        print 'train: %d/%d loss: %.4f, loss_org: %.4f, loss_linear: %.4f, acc: %.2f%%, acc(no root): %.2f%%, time: %.2fs' % (
+            train_inst, train_inst,
+            train_err / train_total, train_err_org / train_total, train_err_linear / train_total,
+            train_corr * 100 / train_total, train_corr_nr * 100 / train_total_nr, time.time() - start_time)
 
         # evaluate performance on dev data
         dev_corr = 0.0
@@ -722,8 +734,8 @@ def main():
             lr = lr * decay_rate
             updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
             train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
-                                       [loss_train, corr_train, corr_nr_train, num_tokens, num_tokens_nr],
-                                       updates=updates)
+                                       [loss_train, loss_train_org, loss_train_el,
+                                        corr_train, corr_nr_train, num_tokens, num_tokens_nr], updates=updates)
 
 
 if __name__ == '__main__':
