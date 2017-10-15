@@ -590,7 +590,7 @@ def main():
     # shape = [batch * max_length]
     loss_train_el = T.sqrt(prediction_train * prediction_eval).sum(axis=1)
     loss_train_el = T.ones_like(loss_train_el) - loss_train_el
-    loss_train_el = (loss_train_el * mask_var_flatten).sum() / num_tokens
+    loss_train_el = (loss_train_el * mask_var_flatten).sum() / (num_tokens / 2.0)
 
     loss_train = loss_train_org + delta * loss_train_el
 
