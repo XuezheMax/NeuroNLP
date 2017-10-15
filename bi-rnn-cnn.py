@@ -587,7 +587,9 @@ def main():
     loss_train_org = lasagne.objectives.categorical_crossentropy(prediction_train, target_var_flatten)
     loss_train_org = (loss_train_org * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
 
-    loss_train_el = lasagne.objectives.squared_error(prediction_train, prediction_eval).sum(axis=1)
+    # shape = [batch * max_length]
+    loss_train_el = T.sqrt(prediction_train * prediction_eval).sum(axis=1)
+    loss_train_el = T.ones_like(loss_train_el) - loss_train_el
     loss_train_el = (loss_train_el * mask_var_flatten).sum() / num_tokens
 
     loss_train = loss_train_org + delta * loss_train_el
