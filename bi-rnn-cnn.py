@@ -631,7 +631,7 @@ def main():
     test_correct_nr = 0.0
     test_total = 0
     test_total_nr = 0
-    lr = learning_rate
+    lr = 0.002
     for epoch in range(1, num_epochs + 1):
         print 'Epoch %d (%s, learning rate=%.4f, decay rate=%.4f): ' % (epoch, architec, lr, decay_rate)
         train_err = 0.0
