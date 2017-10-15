@@ -13,7 +13,7 @@ import theano
 import theano.tensor as T
 from lasagne.layers import Gate
 from lasagne import nonlinearities
-from lasagne.updates import nesterov_momentum, adam
+from lasagne.updates import nesterov_momentum
 
 from neuronlp.io import data_utils, get_logger
 from neuronlp import utils
@@ -587,7 +587,7 @@ def main():
     loss_train_org = lasagne.objectives.categorical_crossentropy(prediction_train, target_var_flatten)
     loss_train_org = (loss_train_org * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
 
-    loss_train_el = T.abs_(prediction_train - prediction_eval).sum(axis=1)
+    loss_train_el = T.sqr(prediction_train - prediction_eval).sum(axis=1)
     loss_train_el = (loss_train_el * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
 
     loss_train = loss_train_org + delta * loss_train_el
@@ -607,8 +607,8 @@ def main():
     corr_eval = (corr_eval * mask_var_flatten).sum(dtype=theano.config.floatX)
 
     params = lasagne.layers.get_all_params(network, trainable=True)
-    # updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
-    updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
+    updates = nesterov_momentum(loss_train, params=params, learning_rate=learning_rate, momentum=momentum)
+    # updates = adam(loss_train, params=params, learning_rate=learning_rate, beta1=0.9, beta2=0.9)
 
     # Compile a function performing a training step on a mini-batch
     train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
@@ -730,8 +730,10 @@ def main():
             test_correct_nr, test_total_nr, test_correct_nr * 100 / test_total_nr, best_epoch)
 
         if epoch in schedule:
-            lr = lr * decay_rate
-            updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
+            # lr = lr * decay_rate
+            lr = learning_rate / (1.0 + epoch * decay_rate)
+            updates = nesterov_momentum(loss_train, params=params, learning_rate=lr, momentum=momentum)
+            # updates = adam(loss_train, params=params, learning_rate=lr, beta1=0.9, beta2=0.9)
             train_fn = theano.function([word_var, char_var, target_var, mask_var, mask_nr_var],
                                        [loss_train, loss_train_org, loss_train_el,
                                         corr_train, corr_nr_train, num_tokens, num_tokens_nr], updates=updates)
