@@ -144,7 +144,7 @@ def exe_rnn(use_embedd, length, num_units, position, binominal):
 
     layer_output = DenseLayer(layer_rnn, num_units=1, nonlinearity=nonlinearities.sigmoid, name='output')
 
-    return train(layer_output, input_var, target_var, batch_size, length, position, binominal)
+    return train(layer_output, layer_rnn, input_var, target_var, batch_size, length, position, binominal)
 
 
 def exe_lstm(use_embedd, length, num_units, position, binominal):
