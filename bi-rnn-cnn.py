@@ -489,7 +489,7 @@ def build_network(architec, word_var, char_var, mask_var, word_alphabet, char_al
         return build_recur_dropout(architec, layer_char_input, layer_word_input, num_units, num_labels, layer_mask,
                                    grad_clipping, num_filters, p)
     else:
-        raise ValueError('unkown dropout patten: %s' % dropout)
+        raise ValueError('unknown dropout patten: %s' % dropout)
 
 
 def main():
@@ -587,7 +587,7 @@ def main():
     loss_train_org = lasagne.objectives.categorical_crossentropy(prediction_train, target_var_flatten)
     loss_train_org = (loss_train_org * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
 
-    loss_train_el = T.abs_(prediction_train - prediction_eval).sum(axis=1)
+    loss_train_el = T.sqr(prediction_train - prediction_eval).sum(axis=1)
     loss_train_el = (loss_train_el * mask_var_flatten).sum(dtype=theano.config.floatX) / num_tokens
 
     loss_train = loss_train_org + delta * loss_train_el
