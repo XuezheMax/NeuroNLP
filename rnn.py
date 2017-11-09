@@ -283,7 +283,7 @@ def main():
     filename = 'tmp/%s.%s.dim=%d.embedd=%s' % ('binominal' if BINOMINAL else 'uniform', architec, NUM_UNITS, USE_EMBEDD)
     fp = open(filename, 'w')
     print 'data: %s' % ('binominal' if BINOMINAL else 'uniform')
-    num_runs = 50
+    num_runs = 100
     for length in [5, 10, 20, 40, 50]:
         result = 0.
         position = 0
@@ -299,6 +299,22 @@ def main():
 
         fp.write('%.2f\n\n' % (result / num_runs))
         fp.flush()
+
+        if length > 20:
+            result = 0.
+            position = 10
+            print 'architecture: %s (dim=%d, length=%d, postion=%d, embedd=%s)' % (
+                architec, NUM_UNITS, length, position, USE_EMBEDD)
+            fp.write('length=%d, pos=%d:\n' % (length, position))
+            fp.flush()
+            for run in range(num_runs):
+                acc = exe(USE_EMBEDD, length, NUM_UNITS, position, BINOMINAL)
+                fp.write('%.2f, ' % acc)
+                result = result + acc
+                fp.flush()
+
+            fp.write('%.2f\n\n' % (result / num_runs))
+            fp.flush()
 
         result = 0.
         position = (length - 1) / 2
